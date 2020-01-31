@@ -268,6 +268,7 @@ namespace Rock.Jobs
 
             var rsvpOccurrences = new AttendanceOccurrenceService( rockContext )
                     .Queryable( "Attendees,Attendees.PersonAlias.Person" ).AsNoTracking()
+                    .Where( o => o.GroupId == group.Id )
                     .Where( o => o.OccurrenceDate >= startDate ) // OccurrenceDate must be greater than startDate (the beginning of the day from the offset).
                     .Where( o => o.OccurrenceDate <= endDate ) // OccurrenceDate must be less than endDate (the end of the day from the offset).
                     .Where( o => o.Attendees.Where( a => a.RSVP == RSVP.Yes ).Any() ) // Occurrence must have attendees who responded "Yes".
