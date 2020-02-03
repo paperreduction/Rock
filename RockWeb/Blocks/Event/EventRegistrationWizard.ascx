@@ -35,6 +35,9 @@
 </script>
 
 <asp:UpdatePanel ID="upnlContent" runat="server">
+    <Triggers>
+        <asp:AsyncPostBackTrigger ControlID="cblCalendars" EventName="SelectedIndexChanged" />
+    </Triggers>
     <ContentTemplate>
 
         <asp:Panel ID="pnlLavaInstructions" runat="server" Visible="false" >
@@ -243,7 +246,7 @@
                             <div class="row">
                                 <div class="col-md-12">
                                     <Rock:PanelWidget ID="pwRegistrationCustomization" runat="server" Title="Registration Customization">
-                                        <Rock:HtmlEditor ID="htmlRegistrationInstructions" runat="server" Label="Registration Instructions" Height="100" Help="These instructions will appear at the beginning of the registration process when selecting how many registrants for the registration." Toolbar="Light" />
+                                        <Rock:HtmlEditor ID="htmlRegistrationInstructions" runat="server" Label="Registration Instructions" Height="100" Help="These instructions will appear at the beginning of the registration process." Toolbar="Light" />
                                         <Rock:HtmlEditor ID="htmlReminderDetails" runat="server" Label="Reminder Details" Height="100" Help="These reminder details will be included in the reminder notification." Toolbar="Light" />
                                         <Rock:HtmlEditor ID="htmlConfirmationDetails" runat="server" Label="Confirmation Details" Height="100" Help="These confirmation details will be appended to those from the registration template when displayed at the end of the registration process." Toolbar="Light" />
                                     </Rock:PanelWidget>
@@ -347,7 +350,7 @@
 
                                         <Rock:RockCheckBoxList ID="cblCalendars" runat="server" Label="Calendars"
                                             Help="Calendars that this item should be added to (at least one is required)."
-                                            OnSelectionChanged="cblCalendars_SelectionChanged" AutoPostBack="true"
+                                            OnSelectedIndexChanged="cblCalendars_SelectedIndexChanged" AutoPostBack="true"
                                             RepeatDirection="Horizontal" Required="true" />
                                         <Rock:RockTextBox ID="tbDetailUrl" runat="server" Label="Details URL"
                                             Help="A custom url to use for showing details of the calendar item (if the default item detail page should not be used)."/>

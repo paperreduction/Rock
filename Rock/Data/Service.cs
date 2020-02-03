@@ -19,7 +19,7 @@ using System.Collections.Generic;
 using System.Data.Entity;
 using System.Linq;
 using System.Linq.Expressions;
-
+using System.Reflection;
 using Rock.Web.Cache;
 using Z.EntityFramework.Plus;
 
@@ -62,7 +62,7 @@ namespace Rock.Data
         public virtual List<string> ErrorMessages { get; set; }
 
         /// <summary>
-        /// Gets a LINQ expression parameter.
+        /// Returns a new instance of a LINQ expression parameter for this service.
         /// </summary>
         /// <value>
         /// The parameter expression.
@@ -97,6 +97,7 @@ namespace Rock.Data
 
         /// <summary>
         /// Gets an <see cref="IQueryable{T}"/> list of all models
+        /// Note: You can sometimes improve performance by using Queryable().AsNoTracking(), but be careful. Lazy-Loading doesn't always work with AsNoTracking  https://stackoverflow.com/a/20290275/1755417
         /// </summary>
         /// <returns></returns>
         public virtual IQueryable<T> Queryable()
@@ -176,8 +177,33 @@ namespace Rock.Data
         }
 
         /// <summary>
+        /// Gets the model with the Guid value, with any related objects to include in the query results (Eager-Loading)
+        /// </summary>
+        /// <typeparam name="TProperty">The type of the property.</typeparam>
+        /// <param name="guid">The GUID.</param>
+        /// <param name="path">The path.</param>
+        /// <returns></returns>
+        public virtual T GetInclude<TProperty>( Guid guid, Expression<Func<T, TProperty>> path )
+        {
+            return AsNoFilter().Include( path ).FirstOrDefault( t => t.Guid == guid );
+        }
+
+        /// <summary>
+        /// Gets the model with the id value, with any related objects to include in the query results (Eager-Loading)
+        /// </summary>
+        /// <typeparam name="TProperty">The type of the property.</typeparam>
+        /// <param name="id">id</param>
+        /// <param name="path">The path.</param>
+        /// <returns></returns>
+        public virtual T GetInclude<TProperty>( int id, Expression<Func<T, TProperty>> path )
+        {
+            return AsNoFilter().Include( path ).FirstOrDefault( t => t.Id == id );
+        }
+
+        /// <summary>
         /// Gets the model with the id value but doesn't load it into the EF ChangeTracker.
-        /// Use this if you won't be making any changes to the record
+        /// Use this if you won't be making any changes to the record and don't need lazy loading
+        /// Note: Lazy-Loading doesn't always work with AsNoTracking  https://stackoverflow.com/a/20290275/1755417
         /// </summary>
         /// <param name="id">id</param>
         /// <returns></returns>
@@ -188,7 +214,8 @@ namespace Rock.Data
 
         /// <summary>
         /// Gets the model with the Guid value but doesn't load it into the EF ChangeTracker.
-        /// Use this if you won't be making any changes to the record
+        /// Use this if you won't be making any changes to the record and don't need lazy loading
+        /// Note: Lazy-Loading doesn't always work with AsNoTracking  https://stackoverflow.com/a/20290275/1755417
         /// </summary>
         /// <param name="guid">The GUID.</param>
         /// <returns></returns>
@@ -233,6 +260,19 @@ namespace Rock.Data
         }
 
         /// <summary>
+        /// Gets a list of items that match the specified expression with EF tracking disabled.
+        /// Use this if you won't be making any changes to the records and don't need lazy loading
+        /// Note: Lazy-Loading doesn't always work with AsNoTracking  https://stackoverflow.com/a/20290275/1755417
+        /// </summary>
+        /// <param name="parameterExpression">The parameter expression.</param>
+        /// <param name="whereExpression">The where expression.</param>
+        /// <returns></returns>
+        public IQueryable<T> GetNoTracking( ParameterExpression parameterExpression, Expression whereExpression )
+        {
+            return Get( parameterExpression, whereExpression, null, null ).AsNoTracking();
+        }
+
+        /// <summary>
         /// Gets a list of items that match the specified expression.
         /// </summary>
         /// <param name="parameterExpression">The parameter expression.</param>
@@ -242,6 +282,20 @@ namespace Rock.Data
         public IQueryable<T> Get( ParameterExpression parameterExpression, Expression whereExpression, Rock.Web.UI.Controls.SortProperty sortProperty )
         {
             return Get( parameterExpression, whereExpression, sortProperty, null );
+        }
+
+        /// <summary>
+        /// Gets the specified parameter expression with no tracking.
+        /// Use this if you won't be making any changes to the records and don't need lazy loading
+        /// Note: Lazy-Loading doesn't always work with AsNoTracking  https://stackoverflow.com/a/20290275/1755417/// </summary>
+        /// <param name="parameterExpression">The parameter expression.</param>
+        /// <param name="whereExpression">The where expression.</param>
+        /// <param name="sortProperty">The sort property.</param>
+        /// <param name="fetchTop">The fetch top.</param>
+        /// <returns></returns>
+        public IQueryable<T> GetNoTracking( ParameterExpression parameterExpression, Expression whereExpression, Rock.Web.UI.Controls.SortProperty sortProperty, int? fetchTop = null )
+        {
+            return this.Queryable().AsNoTracking().Where( parameterExpression, whereExpression, sortProperty, fetchTop );
         }
 
         /// <summary>
@@ -520,6 +574,85 @@ namespace Rock.Data
 
         #endregion
 
+        #region Related Entities
+
+        /// <summary>
+        /// Returns a queryable collection of <see cref="Rock.Data.IEntity"/> entities of the given entity type that (optionally) also have a matching purpose key.
+        /// </summary>
+        /// <param name="entityId">A <see cref="System.Int32"/> representing the entity identifier.</param>
+        /// <param name="relatedEntityTypeId">A <see cref="System.Int32"/> representing the related entity type identifier.</param>
+        /// <param name="purposeKey">A <see cref="System.String"/> representing the purpose key.</param>
+        /// <returns>
+        /// Returns a queryable collection of <see cref="Rock.Data.IEntity"/> entities.
+        /// </returns>
+        public IQueryable<IEntity> GetRelatedEntities( int entityId, int relatedEntityTypeId, string purposeKey = "" )
+        {
+            var rockContext = this.Context as RockContext;
+
+            var entityType = EntityTypeCache.Get( typeof( T ), false, rockContext );
+
+            var srcQuery = new Rock.Model.RelatedEntityService( rockContext ).GetRelatedToSource( entityId, entityType.Id, relatedEntityTypeId, purposeKey );
+
+            var tgtQuery = new Rock.Model.RelatedEntityService( rockContext ).GetRelatedToTarget( entityId, entityType.Id, relatedEntityTypeId, purposeKey );
+
+            if ( srcQuery != null && tgtQuery != null )
+            {
+                return srcQuery.Union( tgtQuery );
+            }
+            else if ( srcQuery != null && tgtQuery == null )
+            {
+                return srcQuery;
+            }
+            else if ( srcQuery == null && tgtQuery != null )
+            {
+                return tgtQuery;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Returns a queryable collection of <see cref="Rock.Data.IEntity"/> target entities (related to the given source entity) for the given entity type and (optionally) also have a matching purpose key.
+        /// </summary>
+        /// <param name="entityId">A <see cref="System.Int32"/> representing the source entity identifier.</param>
+        /// <param name="relatedEntityTypeId">A <see cref="System.Int32"/> representing the related entity type identifier.</param>
+        /// <param name="purposeKey">A <see cref="System.String"/> representing the purpose key.</param>
+        /// <returns>
+        /// Returns a queryable collection of <see cref="Rock.Data.IEntity"/> entities.
+        /// </returns>
+        public IQueryable<IEntity> GetRelatedToSourceEntity( int entityId, int relatedEntityTypeId, string purposeKey = "" )
+        {
+            var rockContext = this.Context as RockContext;
+
+            var entityType = EntityTypeCache.Get( typeof( T ), false, rockContext );
+
+            var srcQuery = new Rock.Model.RelatedEntityService( rockContext ).GetRelatedToSource( entityId, entityType.Id, relatedEntityTypeId, purposeKey );
+
+            return srcQuery;
+        }
+
+        /// <summary>
+        /// Returns a queryable collection of <see cref="Rock.Data.IEntity"/> source entities (related to the given target entity) for the given entity type and (optionally) also have a matching purpose key.
+        /// </summary>
+        /// <param name="entityId">A <see cref="System.Int32"/> representing the target entity identifier.</param>
+        /// <param name="relatedEntityTypeId">A <see cref="System.Int32"/> representing the related entity type identifier.</param>
+        /// <param name="purposeKey">A <see cref="System.String"/> representing the purpose key.</param>
+        /// <returns>
+        /// Returns a queryable collection of <see cref="Rock.Data.IEntity"/> entities.
+        /// </returns>
+        public IQueryable<IEntity> GetRelatedToTargetEntity( int entityId, int relatedEntityTypeId, string purposeKey = "" )
+        {
+            var rockContext = this.Context as RockContext;
+
+            var entityType = EntityTypeCache.Get( typeof( T ), false, rockContext );
+
+            var tgtQuery = new Rock.Model.RelatedEntityService( rockContext ).GetRelatedToTarget( entityId, entityType.Id, relatedEntityTypeId, purposeKey );
+
+            return tgtQuery;
+        }
+
+        #endregion Related Entities
+
         #region Following
 
         /// <summary>
@@ -558,21 +691,14 @@ namespace Rock.Data
         {
             var rockContext = this.Context as RockContext;
 
-            var entityType = EntityTypeCache.Get( typeof( T ), false, rockContext );
-            if ( entityType != null )
+            var entityTypeId = EntityTypeCache.Get( typeof( T ), false, rockContext )?.Id;
+            if ( !entityTypeId.HasValue )
             {
-                var ids = new Rock.Model.FollowingService( rockContext )
-                    .Queryable()
-                    .Where( f =>
-                        f.EntityTypeId == entityType.Id &&
-                        f.PersonAlias != null &&
-                        f.PersonAlias.PersonId == personId )
-                    .Select( f => f.PersonAlias.PersonId );
-
-                return Queryable().Where( t => ids.Contains( t.Id ) );
+                return null;
             }
 
-            return null;
+            var query = new Rock.Model.FollowingService( rockContext ).GetFollowedItems( entityTypeId.Value, personId ).Cast<T>();
+            return query;
         }
 
         #endregion

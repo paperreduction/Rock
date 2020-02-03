@@ -80,23 +80,20 @@ namespace Rock.Attribute
                 int properties = 0;
                 foreach ( var customAttribute in type.GetCustomAttributes( typeof( ContextAwareAttribute ), true ) )
                 {
-                    var contextAttribute = (ContextAwareAttribute)customAttribute;
-                    if ( contextAttribute != null && contextAttribute.EntityType == null )
+                    var contextAttribute = ( ContextAwareAttribute ) customAttribute;
+                    if ( contextAttribute != null && contextAttribute.IsConfigurable )
                     {
-                        if ( contextAttribute.IsConfigurable )
-                        {
-                            string propertyKeyName = string.Format( "ContextEntityType{0}", properties > 0 ? properties.ToString() : "" );
-                            properties++;
+                        string propertyKeyName = string.Format( "ContextEntityType{0}", properties > 0 ? properties.ToString() : "" );
+                        properties++;
 
-                            entityProperties.Add( new EntityTypeFieldAttribute( "Entity Type", false, "The type of entity that will provide context for this block", false, "Context", 0, propertyKeyName ) );
-                        }
+                        entityProperties.Add( new EntityTypeFieldAttribute( "Entity Type", false, "The type of entity that will provide context for this block", false, "Context", 0, propertyKeyName ) );
                     }
                 }
 
                 // Add any property attributes that were defined for the entity
                 foreach ( var customAttribute in type.GetCustomAttributes( typeof( FieldAttribute ), true ) )
                 {
-                    entityProperties.Add( (FieldAttribute)customAttribute );
+                    entityProperties.Add( ( FieldAttribute ) customAttribute );
                 }
 
                 rockContext = rockContext ?? new RockContext();
@@ -339,11 +336,35 @@ namespace Rock.Attribute
         }
 
         /// <summary>
+        /// Loads the attributes.
+        /// </summary>
+        /// <param name="entity">The entity.</param>
+        /// <param name="limitToAttributes">The limit to attributes.</param>
+        public static void LoadAttributes( Rock.Attribute.IHasAttributes entity, List<AttributeCache> limitToAttributes )
+        {
+            using ( var rockContext = new RockContext() )
+            {
+                LoadAttributes( entity, rockContext, limitToAttributes );
+            }
+        }
+
+        /// <summary>
         /// Loads the <see cref="P:IHasAttributes.Attributes" /> and <see cref="P:IHasAttributes.AttributeValues" /> of any <see cref="IHasAttributes" /> object
         /// </summary>
         /// <param name="entity">The item.</param>
         /// <param name="rockContext">The rock context.</param>
         public static void LoadAttributes( Rock.Attribute.IHasAttributes entity, RockContext rockContext )
+        {
+            LoadAttributes( entity, rockContext, null );
+        }
+
+        /// <summary>
+        /// Loads the <see cref="P:IHasAttributes.Attributes" /> and <see cref="P:IHasAttributes.AttributeValues" /> of any <see cref="IHasAttributes" /> object with an option to limit to specific attributes
+        /// </summary>
+        /// <param name="entity">The entity.</param>
+        /// <param name="rockContext">The rock context.</param>
+        /// <param name="limitToAttributes">The limit to attributes.</param>
+        public static void LoadAttributes( Rock.Attribute.IHasAttributes entity, RockContext rockContext, List<AttributeCache> limitToAttributes )
         {
             if ( entity == null )
             {
@@ -378,8 +399,8 @@ namespace Rock.Attribute
             if ( entity is Rock.Attribute.IHasInheritedAttributes )
             {
                 rockContext = rockContext ?? new RockContext();
-                allAttributes = ( (Rock.Attribute.IHasInheritedAttributes)entity ).GetInheritedAttributes( rockContext );
-                altEntityIds = ( (Rock.Attribute.IHasInheritedAttributes)entity ).GetAlternateEntityIds( rockContext );
+                allAttributes = ( ( Rock.Attribute.IHasInheritedAttributes ) entity ).GetInheritedAttributes( rockContext );
+                altEntityIds = ( ( Rock.Attribute.IHasInheritedAttributes ) entity ).GetAlternateEntityIds( rockContext );
             }
 
             allAttributes = allAttributes ?? new List<AttributeCache>();
@@ -430,6 +451,11 @@ namespace Rock.Attribute
                 allAttributes.Add( attribute );
             }
 
+            if ( limitToAttributes?.Any() == true )
+            {
+                allAttributes = allAttributes.Where( a => limitToAttributes.Any( l => l.Id == a.Id ) ).ToList();
+            }
+
             var attributeValues = new Dictionary<string, AttributeValueCache>();
 
             if ( allAttributes.Any() )
@@ -464,24 +490,33 @@ namespace Rock.Attribute
 
                     if ( attributeIds.Count != 1 )
                     {
-                        // a Linq query that uses 'Contains' can't be cached in the EF Plan Cache, so instead of doing a Contains, build a List of OR conditions. This can save 15-20ms per call (and still ends up with the exact same SQL)
-                        var parameterExpression = attributeValueService.ParameterExpression;
-                        MemberExpression propertyExpression = Expression.Property( parameterExpression, "AttributeId" );
-                        Expression expression = null;
-                        foreach ( var attributeId in attributeIds )
+                        if ( attributeIds.Count >= 1000 )
                         {
-                            Expression attributeIdValue = Expression.Constant( attributeId );
-                            if ( expression != null )
-                            {
-                                expression = Expression.Or( expression, Expression.Equal( propertyExpression, attributeIdValue ) );
-                            }
-                            else
-                            {
-                                expression = Expression.Equal( propertyExpression, attributeIdValue );
-                            }
+                            // the linq Expression.Or tree gets too big if there is more than 1000 attributes, so just do a contains instead
+                            attributeValueQuery = attributeValueQuery.Where( v => attributeIds.Contains( v.AttributeId ) );
                         }
+                        else
+                        {
+                            // a Linq query that uses 'Contains' can't be cached in the EF Plan Cache, so instead of doing a Contains, build a List of OR conditions. This can save 15-20ms per call (and still ends up with the exact same SQL)
+                            var parameterExpression = attributeValueService.ParameterExpression;
+                            MemberExpression propertyExpression = Expression.Property( parameterExpression, "AttributeId" );
+                            Expression expression = null;
 
-                        attributeValueQuery = attributeValueQuery.Where( parameterExpression, expression );
+                            foreach ( var attributeId in attributeIds )
+                            {
+                                Expression attributeIdValue = Expression.Constant( attributeId );
+                                if ( expression != null )
+                                {
+                                    expression = Expression.Or( expression, Expression.Equal( propertyExpression, attributeIdValue ) );
+                                }
+                                else
+                                {
+                                    expression = Expression.Equal( propertyExpression, attributeIdValue );
+                                }
+                            }
+
+                            attributeValueQuery = attributeValueQuery.Where( parameterExpression, expression );
+                        }
                     }
                     else
                     {

@@ -73,7 +73,7 @@
                                             AutoPostBack="true" OnCheckedChanged="cbMultipleRegistrants_CheckedChanged" />
                                     </div>
                                     <div class="col-xs-6">
-                                        <Rock:NumberBox MinimumValue="1" ID="nbMaxRegistrants" runat="server" Label="Maximum Registrants"
+                                        <Rock:NumberBox MinimumValue="1" ID="nbMaxRegistrants" runat="server" Label="Max Registrants Per Registration"
                                          Help="The maximum number of registrants that a person is allowed to register at one time. Leave blank for unlimited." Visible="false" />
                                     </div>
                                 </div>
@@ -87,7 +87,7 @@
                                                 Help="If Registrants in Same Family option is set to 'Yes' or 'Ask', should the person registering be able to select people from their family when registering (vs. having to enter the family member's information manually)?" />
                                         </div>
 
-                                        <Rock:RockCheckBox id="cbWaitListEnabled" runat="server" Label="Enable Wait List" Text="Yes" Help="Check to enable a 'wait list' once the registration's maximum attendees has been reached." />
+                                        <Rock:RockCheckBox id="cbWaitListEnabled" runat="server" Label="Enable Wait List" Text="Yes" Help="Check to enable a 'wait list' once the registration's maximum attendees has been reached. The 'Maximum Attendees' must be set on the registration instance for this feature to work." />
                                     </div>
                                     <div class="col-xs-6">
                                         <Rock:RockDropDownList ID="ddlRegistrarOption" runat="server" Label="Registrar Options">
@@ -269,7 +269,7 @@
                             <div class="col-md-12">
                                 <Rock:RockTextBox ID="tbSuccessTitle" runat="server" Label="Success Title" Placeholder="Congratulations"
                                     Help="The heading to display to user after successfully completing a registration of this type." />
-                                <Rock:HtmlEditor ID="heInstructions" runat="server" Label="Registration Instructions" ResizeMaxWidth="720" Height="300" Help="These instructions will appear at the beginning of the registration process when selecting how many registrants for the registration." Toolbar="Light" />
+                                <Rock:HtmlEditor ID="heInstructions" runat="server" Label="Registration Instructions" ResizeMaxWidth="720" Height="300" Help="These instructions will appear at the beginning of the registration process." Toolbar="Light" />
                                 <Rock:CodeEditor ID="ceSuccessText" runat="server" Label="Registration Confirmation Text" EditorMode="Lava" EditorTheme="Rock" EditorHeight="300"
                                     Help="The text to display to user after successfully completing a registration of this type. If there are costs or fees for this registration, a summary of those will be displayed after this text." />
                             </div>
@@ -484,6 +484,8 @@
             <Content>
                 <asp:HiddenField ID="hfDiscountGuid" runat="server" />
                 <asp:ValidationSummary ID="ValidationSummaryDiscount" runat="server" HeaderText="Please correct the following:" CssClass="alert alert-validation" ValidationGroup="Discount" />
+                <Rock:NotificationBox ID="nbDuplicateDiscountCode" runat="server" NotificationBoxType="Warning" Visible="false" />
+
                 <div class="row">
                     <div class="col-md-6">
                         <Rock:RockTextBox ID="tbDiscountCode" runat="server" CssClass="input-width-xl" Label="Discount Code" ValidationGroup="Discount" Required="true" />

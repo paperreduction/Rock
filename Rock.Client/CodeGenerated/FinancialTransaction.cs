@@ -79,6 +79,9 @@ namespace Rock.Client
         public bool ModifiedAuditValuesAlreadyUpdated { get; set; }
 
         /// <summary />
+        public int? NonCashAssetTypeValueId { get; set; }
+
+        /// <summary />
         public int? ProcessedByPersonAliasId { get; set; }
 
         /// <summary />
@@ -107,6 +110,9 @@ namespace Rock.Client
 
         /// <summary />
         public string Summary { get; set; }
+
+        /// <summary />
+        public DateTime? SundayDate { get; set; }
 
         /// <summary />
         public string TransactionCode { get; set; }
@@ -164,6 +170,7 @@ namespace Rock.Client
             this.IsSettled = source.IsSettled;
             this.MICRStatus = source.MICRStatus;
             this.ModifiedAuditValuesAlreadyUpdated = source.ModifiedAuditValuesAlreadyUpdated;
+            this.NonCashAssetTypeValueId = source.NonCashAssetTypeValueId;
             this.ProcessedByPersonAliasId = source.ProcessedByPersonAliasId;
             this.ProcessedDateTime = source.ProcessedDateTime;
             this.ScheduledTransactionId = source.ScheduledTransactionId;
@@ -174,6 +181,7 @@ namespace Rock.Client
             this.Status = source.Status;
             this.StatusMessage = source.StatusMessage;
             this.Summary = source.Summary;
+            this.SundayDate = source.SundayDate;
             this.TransactionCode = source.TransactionCode;
             this.TransactionDateTime = source.TransactionDateTime;
             this.TransactionTypeValueId = source.TransactionTypeValueId;
@@ -205,10 +213,10 @@ namespace Rock.Client
         public ICollection<FinancialTransactionImage> Images { get; set; }
 
         /// <summary />
-        public DefinedValue SourceTypeValue { get; set; }
+        public DefinedValue NonCashAssetTypeValue { get; set; }
 
         /// <summary />
-        public DateTime? SundayDate { get; set; }
+        public DefinedValue SourceTypeValue { get; set; }
 
         /// <summary />
         public ICollection<FinancialTransactionDetail> TransactionDetails { get; set; }

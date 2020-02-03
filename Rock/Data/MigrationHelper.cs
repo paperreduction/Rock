@@ -135,6 +135,47 @@ namespace Rock.Data
         }
 
         /// <summary>
+        /// Renames the EntityType by guid (if it exists); otherwise it inserts a new record.
+        /// </summary>
+        /// <param name="name">The name.</param>
+        /// <param name="friendlyName">Name of the friendly.</param>
+        /// <param name="assemblyName">Name of the assembly.</param>
+        /// <param name="isEntity">if set to <c>true</c> [is entity].</param>
+        /// <param name="isSecured">if set to <c>true</c> [is secured].</param>
+        /// <param name="guid">The GUID.</param>
+        public void RenameEntityType( string guid, string name, string friendlyName, string assemblyName, bool isEntity, bool isSecured )
+        {
+            var nameParam = name.Replace( "'", "''" );
+            var friendlyNameParam = friendlyName.Replace( "'", "''" );
+            var assemblyNameParam = assemblyName.Replace( "'", "''" );
+            var isEntityParam = isEntity ? "1" : "0";
+            var isSecuredParam = isSecured ? "1" : "0";
+
+            Migration.Sql( string.Format( $@"
+                DELETE FROM EntityType WHERE Name = '{nameParam}' AND Guid <> '{guid}';
+                DECLARE @Guid uniqueidentifier = (SELECT [Guid] FROM [EntityType] WHERE [Guid] = '{guid}');
+                IF @Guid IS NULL
+                BEGIN
+                    INSERT INTO [EntityType] (
+                        [Name],[FriendlyName],[AssemblyName],[IsEntity],[IsSecured],[IsCommon],[Guid])
+                    VALUES(
+                        '{nameParam}','{friendlyNameParam}','{assemblyNameParam}',{isEntityParam},{isSecuredParam}, 0,'{guid}')
+                END
+                ELSE
+                BEGIN
+
+                    UPDATE [EntityType] SET
+                        [Name] = '{nameParam}',
+                        [FriendlyName] = '{friendlyNameParam}',
+                        [AssemblyName] = '{assemblyNameParam}',
+                        [IsEntity] = {isEntityParam},
+                        [IsSecured] = {isSecuredParam}
+                    WHERE [Guid] = '{guid}'
+
+                END" ) );
+        }
+
+        /// <summary>
         /// Deletes the EntityType.
         /// </summary>
         /// <param name="guid">The GUID.</param>
@@ -244,6 +285,40 @@ namespace Rock.Data
         #endregion
 
         #region Block Type Methods
+
+        /// <summary>
+        /// Updates or inserts a block type of category Mobile. For mobile
+        /// </summary>
+        /// <param name="name">The name.</param>
+        /// <param name="description">The description.</param>
+        /// <param name="entityName">Name of the entity.</param>
+        /// <param name="guid">The unique identifier.</param>
+        public void UpdateMobileBlockType( string name, string description, string entityName, string guid )
+        {
+            Migration.Sql( $@"
+                DECLARE @entityTypeId INT = (SELECT [Id] FROM [EntityType] WHERE [Name] = '{entityName}')
+
+                IF (@entityTypeId IS NULL)
+                BEGIN 
+	                RETURN
+                END
+
+                IF EXISTS (SELECT [Id] FROM [BlockType] WHERE [EntityTypeId] = @entityTypeId)
+                BEGIN
+	                UPDATE [BlockType]
+	                SET [IsSystem] = 1,
+		                [Category] = 'Mobile',
+		                [Name] = '{name}',
+		                [Description] = '{description.Replace( "'", "''" )}',
+		                [Guid] = '{guid.ToUpper()}'
+	                WHERE [EntityTypeId] = @entityTypeId
+                END
+                ELSE
+                BEGIN
+	                INSERT INTO [BlockType]([IsSystem],[Category],[Name],[Description],[Guid], EntityTypeId)
+	                VALUES(1,'Mobile','{name}','{description.Replace( "'", "''" )}','{guid.ToUpper()}', @entityTypeId)
+                END" );
+        }
 
         /// <summary>
         /// Updates the BlockType by Path (if it exists).
@@ -798,6 +873,17 @@ namespace Rock.Data
         }
 
         /// <summary>
+        /// Deletes the page route.
+        /// </summary>
+        /// <param name="pageRouteGuid">The page route unique identifier.</param>
+        public void DeletePageRoute( string pageRouteGuid )
+        {
+            string sql = $@"
+                DELETE FROM [dbo].[PageRoute] WHERE [Guid] = '{pageRouteGuid}';
+            ";
+        }
+
+        /// <summary>
         /// Adds or Updates PageContext to the given page, entity, idParameter
         /// </summary>
         /// <param name="pageGuid">The page GUID.</param>
@@ -850,6 +936,46 @@ namespace Rock.Data
                 BEGIN
 	                UPDATE [dbo].[Page] SET [LayoutId] = @layoutId WHERE [Guid] = '{pageGuid}'
                 END";
+
+            Migration.Sql( sql );
+        }
+
+        /// <summary>
+        /// Updates the page icon.
+        /// </summary>
+        /// <param name="pageGuid">The page unique identifier.</param>
+        /// <param name="iconCssClass">The layout unique identifier.</param>
+        public void UpdatePageIcon( string pageGuid, string iconCssClass )
+        {
+            var sql = $"UPDATE [dbo].[Page] SET [IconCssClass] = '{iconCssClass}' WHERE [Guid] = '{pageGuid}'";
+            Migration.Sql( sql );
+        }
+
+        /// <summary>
+        /// Updates if the page's title shows in the breadcrumbs.
+        /// </summary>
+        /// <param name="pageGuid">The page unique identifier.</param>
+        /// <param name="breadCrumbDisplayName">if set to <c>true</c> [bread crumb display name].</param>
+        public void UpdatePageBreadcrumb( string pageGuid, bool breadCrumbDisplayName )
+        {
+            var sql = $"UPDATE [dbo].[Page] SET [BreadCrumbDisplayName] = {(breadCrumbDisplayName ? 1 : 0)} WHERE [Guid] = '{pageGuid}'";
+            Migration.Sql( sql );
+        }
+
+        /// <summary>
+        /// Updates the page internal name, browser title, and page title
+        /// </summary>
+        /// <param name="pageGuid">The page unique identifier.</param>
+        /// <param name="newName">The new name.</param>
+        public void RenamePage( string pageGuid, string newName )
+        {
+            string sql = $@"
+UPDATE [Page] 
+SET
+    [InternalName] = '{newName}',
+    [PageTitle] = '{newName}',
+    [BrowserTitle] = '{newName}'
+WHERE [Guid] = '{pageGuid}';";
 
             Migration.Sql( sql );
         }
@@ -1731,6 +1857,7 @@ namespace Rock.Data
         /// </summary>
         /// <param name="groupGuid">The group unique identifier.</param>
         /// <param name="name">The name the group member attribute. The attribute key will become the name with the whitespace removed.</param>
+        /// <param name="abbreviatedName">Name of the abbreviated.</param>
         /// <param name="description">The description.</param>
         /// <param name="order">The order.</param>
         /// <param name="defaultValue">The default value.</param>
@@ -2076,9 +2203,9 @@ namespace Rock.Data
                     fieldTypeGuid,
                     key,
                     name,
-                    description.Replace( "'", "''" ),
+                    description?.Replace( "'", "''" ) ?? string.Empty,
                     order,
-                    defaultValue.Replace( "'", "''" ),
+                    defaultValue?.Replace( "'", "''" ) ?? string.Empty,
                     guid,
                     entityTypeQualifierColumn,
                     entityTypeQualifierValue )
@@ -2534,6 +2661,9 @@ namespace Rock.Data
 
         /// <summary>
         /// Adds a new attribute value for the given attributeGuid if it does not already exist.
+        /// Note: Attribute values are sometimes deleted and inserted, so GUID is not reliable to find a value.
+        /// This methods uses the attribute ID and EntityId to check for an existing row before inserting.
+        /// If the provided Guid already exists or is not a valid GUID then a new one is created before inserting.
         /// </summary>
         /// <param name="attributeGuid">The attribute GUID.</param>
         /// <param name="entityId">The entity id.</param>
@@ -2541,22 +2671,40 @@ namespace Rock.Data
         /// <param name="guid">The GUID.</param>
         public void AddAttributeValue( string attributeGuid, int entityId, string value, string guid )
         {
-            Migration.Sql( string.Format( @"
+            Guid outGuid;
+            string guidQuery = string.Empty;
+            if (guid.IsNotNullOrWhiteSpace() && Guid.TryParse( guid, out outGuid ) )
+            {
+                guidQuery = $@"
+                    -- A GUID was provided, try to use it if it is available
+                    IF NOT EXISTS(SELECT * FROM [AttributeValue] WHERE [Guid] = '{guid}')
+                    BEGIN
+	                    SET @AttributeValueGuid = '{guid}'
+                    END";
+            }
 
-                DECLARE @AttributeId int
-                SET @AttributeId = (SELECT [Id] FROM [Attribute] WHERE [Guid] = '{0}')
+            Migration.Sql( $@"
+                DECLARE @AttributeId INT = (SELECT [Id] FROM [Attribute] WHERE [Guid] = '{attributeGuid}')
+                DECLARE @AttributeValueGuid UNIQUEIDENTIFIER = NEWID()
 
-                IF NOT EXISTS(Select * FROM [AttributeValue] WHERE [Guid] = '{3}')
+                {guidQuery}
+
+                -- Now check if the attribute/entity pair already has a row and insert it if not
+                IF NOT EXISTS(SELECT [Id] FROM [dbo].[AttributeValue] WHERE [AttributeId] = @AttributeId AND [EntityId] = {entityId})
+                BEGIN
                     INSERT INTO [AttributeValue] (
-                        [IsSystem],[AttributeId],[EntityId],[Value],[Guid])
+                          [IsSystem]
+		                , [AttributeId]
+		                , [EntityId]
+		                , [Value]
+		                , [Guid])
                     VALUES(
-                        1,@AttributeId,{1},'{2}','{3}')
-",
-                    attributeGuid,
-                    entityId,
-                    value,
-                    guid )
-            );
+                          1
+		                , @AttributeId
+		                , {entityId}
+		                , '{value}'
+		                , @AttributeValueGuid)
+                END" );
         }
 
         /// <summary>
@@ -2602,6 +2750,41 @@ namespace Rock.Data
                     value, // {2}
                     guid ) // {3}
             );
+        }
+
+        /// <summary>
+        /// Adds the attribute qualifier.
+        /// </summary>
+        /// <param name="attributeGuid">The attribute unique identifier.</param>
+        /// <param name="definedTypeGuid">The defined type guid.</param>
+        /// <param name="guid">The unique identifier.</param>
+        public void AddDefinedTypeAttributeQualifier( string attributeGuid, string definedTypeGuid, string guid )
+        {
+            var key = "definedtype";
+
+            Migration.Sql( $@"
+                DECLARE @definedTypeId INT = (SELECT Id FROM DefinedType WHERE Guid = '{definedTypeGuid}');
+
+                IF @definedTypeId IS NOT NULL
+                BEGIN
+                    DECLARE @AttributeId int
+                    SET @AttributeId = (SELECT [Id] FROM [Attribute] WHERE [Guid] = '{attributeGuid}')
+
+                    IF NOT EXISTS(Select * FROM [AttributeQualifier] WHERE [Guid] = '{guid}')
+                    BEGIN
+                        INSERT INTO [AttributeQualifier] (
+                            [IsSystem],[AttributeId],[Key],[Value],[Guid])
+                        VALUES(
+                            1,@AttributeId,'{key}',@definedTypeId,'{guid}')
+                    END
+                    ELSE
+                    BEGIN
+                        UPDATE [AttributeQualifier] SET
+                            [Key] = '{key}',
+                            [Value] = @definedTypeId
+                        WHERE [Guid] = '{guid}'
+                    END
+                END" );
         }
 
         /// <summary>
@@ -4419,12 +4602,45 @@ END
         /// <param name="name">The name.</param>
         /// <param name="description">The description.</param>
         /// <param name="order">The order.</param>
+        /// <param name="defaultValue">The default value.</param>
+        /// <param name="guid">The unique identifier.</param>
+        /// <param name="abbreviatedName">Name of the abbreviated.</param>
+        public void AddGroupTypeGroupAttribute( string groupTypeGuid, string fieldTypeGuid, string name, string description, int order, string defaultValue, string guid, string abbreviatedName )
+        {
+            AddGroupTypeGroupAttribute( groupTypeGuid, fieldTypeGuid, name, description, order, defaultValue, guid, false, abbreviatedName );
+        }
+
+        /// <summary>
+        /// Adds (or Updates) a new GroupType "Group Attribute" for the given GroupType using the given values.
+        /// </summary>
+        /// <param name="groupTypeGuid">The group type unique identifier.</param>
+        /// <param name="fieldTypeGuid">The field type unique identifier.</param>
+        /// <param name="name">The name.</param>
+        /// <param name="description">The description.</param>
+        /// <param name="order">The order.</param>
         /// <param name="defaultValue">a string, empty string, or NULL</param>
         /// <param name="guid">The unique identifier.</param>
         /// <param name="isRequired">if set to <c>true</c> [is required].</param>
         public void AddGroupTypeGroupAttribute( string groupTypeGuid, string fieldTypeGuid, string name, string description, int order, string defaultValue, string guid, bool isRequired )
         {
             AddGroupTypeAttribute( "Rock.Model.Group", groupTypeGuid, fieldTypeGuid, name, description, order, defaultValue, isRequired, guid );
+        }
+
+        /// <summary>
+        /// Adds (or Updates) a new GroupType "Group Attribute" for the given GroupType using the given values.
+        /// </summary>
+        /// <param name="groupTypeGuid">The group type unique identifier.</param>
+        /// <param name="fieldTypeGuid">The field type unique identifier.</param>
+        /// <param name="name">The name.</param>
+        /// <param name="description">The description.</param>
+        /// <param name="order">The order.</param>
+        /// <param name="defaultValue">The default value.</param>
+        /// <param name="guid">The unique identifier.</param>
+        /// <param name="isRequired">if set to <c>true</c> [is required].</param>
+        /// <param name="abbreviatedName">Name of the abbreviated.</param>
+        public void AddGroupTypeGroupAttribute( string groupTypeGuid, string fieldTypeGuid, string name, string description, int order, string defaultValue, string guid, bool isRequired, string abbreviatedName )
+        {
+            AddGroupTypeAttribute( "Rock.Model.Group", groupTypeGuid, fieldTypeGuid, name, description, order, defaultValue, isRequired, guid, abbreviatedName );
         }
 
         /// <summary>
@@ -4444,6 +4660,24 @@ END
         }
 
         /// <summary>
+        /// Adds (or Updates) a new GroupType "Member Attribute" for the given GroupType using the given values.
+        /// </summary>
+        /// <param name="groupTypeGuid">The group type unique identifier.</param>
+        /// <param name="fieldTypeGuid">The field type unique identifier.</param>
+        /// <param name="name">The name.</param>
+        /// <param name="description">The description.</param>
+        /// <param name="order">The order.</param>
+        /// <param name="defaultValue">The default value.</param>
+        /// <param name="guid">The unique identifier.</param>
+        /// <param name="isRequired">if set to <c>true</c> [is required].</param>
+        /// <param name="abbreviatedName">Name of the abbreviated.</param>
+        public void AddGroupTypeGroupMemberAttribute( string groupTypeGuid, string fieldTypeGuid, string name, string description, int order, string defaultValue, string guid, bool isRequired, string abbreviatedName )
+        {
+            AddGroupTypeAttribute( "Rock.Model.GroupMember", groupTypeGuid, fieldTypeGuid, name, description, order, defaultValue, isRequired, guid, abbreviatedName );
+        }
+
+
+        /// <summary>
         /// Adds (or Updates) the group type attribute
         /// </summary>
         /// <param name="entityTypeName">Name of the entity type.</param>
@@ -4456,6 +4690,92 @@ END
         /// <param name="isRequired">if set to <c>true</c> [is required].</param>
         /// <param name="guid">The unique identifier.</param>
         private void AddGroupTypeAttribute( string entityTypeName, string groupTypeGuid, string fieldTypeGuid, string name, string description, int order, string defaultValue, bool isRequired, string guid )
+        {
+            string defaultValueDbParam = ( defaultValue == null ) ? "NULL" : "'" + defaultValue + "'";
+            string attributeKey = name.RemoveSpaces();
+
+            Migration.Sql( $@"
+
+                DECLARE @EntityTypeId int
+                SET @EntityTypeId = (SELECT [Id] FROM [EntityType] WHERE [Name] = '{entityTypeName}')
+
+                DECLARE @GroupTypeId int
+                SET @GroupTypeId = (SELECT [Id] FROM [GroupType] WHERE [Guid] = '{groupTypeGuid}')
+
+                DECLARE @FieldTypeId int
+                SET @FieldTypeId = (SELECT [Id] FROM [FieldType] WHERE [Guid] = '{fieldTypeGuid}')
+
+                IF EXISTS (
+                    SELECT [Id]
+                    FROM [Attribute]
+                    WHERE [EntityTypeId] = @EntityTypeId
+                    AND [EntityTypeQualifierColumn] = 'GroupTypeId'
+                    AND [EntityTypeQualifierValue] = @GroupTypeId
+                    AND [Key] = '{attributeKey}' )
+                BEGIN
+                    UPDATE [Attribute] SET
+                        [FieldTypeId] = @FieldTypeId,
+                        [Name] = '{name}',
+                        [Description] = '{description.Replace( "'", "''" )}',
+                        [Order] = {order},
+                        [DefaultValue] = {defaultValueDbParam},
+                        [IsRequired]= {isRequired.Bit()},
+                        [Guid] = '{guid}'
+                    WHERE [EntityTypeId] = @EntityTypeId
+                    AND [EntityTypeQualifierColumn] = 'GroupTypeId'
+                    AND [EntityTypeQualifierValue] = @GroupTypeId
+                    AND [Key] = '{attributeKey}'
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO [Attribute]
+                        ([IsSystem]
+                        ,[FieldTypeId]
+                        ,[EntityTypeId]
+                        ,[EntityTypeQualifierColumn]
+                        ,[EntityTypeQualifierValue]
+                        ,[Key]
+                        ,[Name]
+                        ,[Description]
+                        ,[Order]
+                        ,[IsGridColumn]
+                        ,[DefaultValue]
+                        ,[IsMultiValue]
+                        ,[IsRequired]
+                        ,[Guid])
+                    VALUES
+                        (1
+                        ,@FieldTypeId
+                        ,@EntityTypeId
+                        ,'GroupTypeId'
+                        ,@GroupTypeId
+                        ,'{attributeKey}'
+                        ,'{name}'
+                        ,'{description.Replace( "'", "''" )}'
+                        ,{order}
+                        ,0
+                        ,{defaultValueDbParam}
+                        ,0
+                        ,{isRequired.Bit()}
+                        ,'{guid}')
+                END
+                ");
+        }
+
+        /// <summary>
+        /// Adds the group type attribute.
+        /// </summary>
+        /// <param name="entityTypeName">Name of the entity type.</param>
+        /// <param name="groupTypeGuid">The group type unique identifier.</param>
+        /// <param name="fieldTypeGuid">The field type unique identifier.</param>
+        /// <param name="name">The name.</param>
+        /// <param name="description">The description.</param>
+        /// <param name="order">The order.</param>
+        /// <param name="defaultValue">The default value.</param>
+        /// <param name="isRequired">if set to <c>true</c> [is required].</param>
+        /// <param name="guid">The unique identifier.</param>
+        /// <param name="abbreviatedName">Name of the abbreviated.</param>
+        private void AddGroupTypeAttribute( string entityTypeName, string groupTypeGuid, string fieldTypeGuid, string name, string description, int order, string defaultValue, bool isRequired, string guid, string abbreviatedName )
         {
             string defaultValueDbParam = ( defaultValue == null ) ? "NULL" : "'" + defaultValue + "'";
             string attributeKey = name.RemoveSpaces();
@@ -5126,6 +5446,7 @@ END
         /// <param name="subject">The subject.</param>
         /// <param name="body">The body.</param>
         /// <param name="guid">The unique identifier.</param>
+        [RockObsolete( "1.10.2" )]
         public void UpdateSystemEmail( string category, string title, string from, string fromName, string to,
             string cc, string bcc, string subject, string body, string guid )
         {
@@ -5188,9 +5509,123 @@ END
         /// Deletes the SystemEmail.
         /// </summary>
         /// <param name="guid">The GUID.</param>
+        [RockObsolete( "1.10.2" )]
         public void DeleteSystemEmail( string guid )
         {
             DeleteByGuid( guid, "SystemEmail" );
+        }
+
+        /// <summary>
+        /// Updates or Inserts the SystemCommunication.
+        /// </summary>
+        /// <param name="category">The category.</param>
+        /// <param name="title">The title.</param>
+        /// <param name="from">From.</param>
+        /// <param name="fromName">From name.</param>
+        /// <param name="to">To.</param>
+        /// <param name="cc">The cc.</param>
+        /// <param name="bcc">The BCC.</param>
+        /// <param name="subject">The subject.</param>
+        /// <param name="body">The body.</param>
+        /// <param name="guid">The unique identifier.</param>
+        /// <param name="isActive">The IsActive value (default true).</param>
+        /// <param name="smsMessage">The SMS Message (default blank).</param>
+        /// <param name="smsFromDefinedValueId">The SMSFromDefinedValueId value (default null).</param>
+        /// <param name="pushTitle">The Push Title (default blank).</param>
+        /// <param name="pushMessage">The Push Message (default blank).</param>
+        /// <param name="pushSound">The Push Sound (default blank).</param>
+        public void UpdateSystemCommunication( string category, string title, string from, string fromName, string to,
+            string cc, string bcc, string subject, string body, string guid, bool isActive = true, string smsMessage = "",
+            int? smsFromDefinedValueId = null, string pushTitle = "", string pushMessage = "", string pushSound = "" )
+        {
+            string isActiveText = "0";
+            if ( isActive )
+            {
+                isActiveText = "1";
+            }
+
+            string smsFromDefinedValueIdText = "NULL";
+            if ( smsFromDefinedValueId.HasValue )
+            {
+                smsFromDefinedValueIdText = smsFromDefinedValueId.Value.ToString();
+            }
+
+            Migration.Sql( string.Format(@"
+
+                DECLARE @SystemCommunicationEntity int = (
+                    SELECT TOP 1 [Id]
+                    FROM [EntityType]
+                    WHERE [Name] = 'Rock.Model.SystemCommunication' )
+
+                DECLARE @CategoryId int = (
+                    SELECT TOP 1 [Id] FROM [Category]
+                    WHERE [EntityTypeId] = @SystemCommunicationEntity
+                    AND [Name] = '{0}' )
+
+                IF @CategoryId IS NULL AND @SystemCommunicationEntity IS NOT NULL
+                BEGIN
+                    INSERT INTO [Category] ( [IsSystem],[EntityTypeId],[Name],[Order],[Guid] )
+                    VALUES( 0, @SystemCommunicationEntity,'{0}', 0, NEWID() )
+                    SET @CategoryId = SCOPE_IDENTITY()
+                END
+
+                DECLARE @Id int
+                SET @Id = (SELECT [Id] FROM [SystemCommunication] WHERE [guid] = '{9}')
+                IF @Id IS NULL
+                BEGIN
+                    INSERT INTO [SystemCommunication] (
+                        [IsSystem],[CategoryId],[Title],[From],[FromName],[To],[cc],[Bcc],[Subject],[Body],[Guid],
+                        [IsActive], [SMSMessage], [SMSFromDefinedValueId], [PushTitle], [PushMessage], [PushSound])
+                    VALUES(
+                        1, @CategoryId,'{1}','{2}','{3}','{4}','{5}','{6}','{7}','{8}','{9}',{10},'{11}',{12},'{13}','{14}','{15}')
+                    END
+                ELSE
+                BEGIN
+                    UPDATE [SystemCommunication] SET
+                        [CategoryId] = @CategoryId,
+                        [Title] = '{1}',
+                        [From] = '{2}',
+                        [FromName] = '{3}',
+                        [To] = '{4}',
+                        [Cc] = '{5}',
+                        [Bcc] = '{6}',
+                        [Subject] = '{7}',
+                        [Body] = '{8}',
+                        [IsActive] = {10},
+                        [SMSMessage] = '{11}',
+                        [SMSFromDefinedValueId] = {12},
+                        [PushTitle] = '{13}',
+                        [PushMessage] = '{14}',
+                        [PushSound] = '{15}'
+                    WHERE [Guid] = '{9}'
+                END
+",
+                    category.Replace( "'", "''" ),
+                    title.Replace( "'", "''" ),
+                    from.Replace( "'", "''" ),
+                    fromName.Replace( "'", "''" ),
+                    to.Replace( "'", "''" ),
+                    cc.Replace( "'", "''" ),
+                    bcc.Replace( "'", "''" ),
+                    subject.Replace( "'", "''" ),
+                    body.Replace( "'", "''" ),
+                    guid,
+                    isActiveText,
+                    smsMessage.Replace( "'", "''" ),
+                    smsFromDefinedValueIdText,
+                    pushTitle.Replace( "'", "''" ),
+                    pushMessage.Replace( "'", "''" ),
+                    pushSound.Replace( "'", "''" )
+                    ) );
+        }
+
+        /// <summary>
+        /// Deletes the SystemCommunication.
+        /// </summary>
+        /// <param name="guid">The GUID.</param>
+        public void DeleteSystemCommunication( string guid )
+        {
+            DeleteByGuid( guid, "SystemCommunication");
         }
 
         #endregion

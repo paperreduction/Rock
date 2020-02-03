@@ -62,7 +62,7 @@ namespace Rock.Utility
                 string keywordExpression = dvWorkflow.GetAttributeValue( "KeywordExpression" );
                 if ( string.IsNullOrWhiteSpace( keywordExpression ) )
                 {
-                    // if there was no keyword expression add wildcard expression
+                    // if there was no keyword expression add wild card expression
                     keywordExpression = ".*";
                 }
 
@@ -119,10 +119,8 @@ namespace Rock.Utility
                 using ( var rockContext = new RockContext() )
                 {
                     fromPerson = GetPerson( fromPhone, rockContext );
+                    LaunchWorkflow( workflowType, nameTemplate, fromPerson, fromPhone, toPhone, message, matchGroups, null, workflowAttributesSettings, out response );
                 }
-
-                LaunchWorkflow( workflowType, nameTemplate, fromPerson, fromPhone, toPhone, message, matchGroups, null, workflowAttributesSettings, out response );
-
                 // once we find one match stop processing
                 break;
             }
@@ -142,7 +140,7 @@ namespace Rock.Utility
         /// <param name="response">The response to be sent back to the user.</param>
         public static void LaunchWorkflow( WorkflowTypeCache workflowType, string nameTemplate, Person fromPerson, string fromPhone, string toPhone, string message, List<BinaryFile> attachments, List<KeyValuePair<string, object>> workflowAttributesSettings, out string response )
         {
-            LaunchWorkflow( workflowType, nameTemplate, fromPerson, fromPhone, toPhone, message, null, workflowAttributesSettings, out response );
+            LaunchWorkflow( workflowType, nameTemplate, fromPerson, fromPhone, toPhone, message, null, attachments, workflowAttributesSettings, out response );
         }
 
         /// <summary>

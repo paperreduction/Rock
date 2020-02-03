@@ -240,12 +240,17 @@ namespace RockWeb
                         foreach ( ServiceJob job in jobService.GetActiveJobs().ToList() )
                         {
                             const string errorLoadingStatus = "Error Loading Job";
+
                             try  
                             {
                                 IJobDetail jobDetail = jobService.BuildQuartzJob( job );
                                 ITrigger jobTrigger = jobService.BuildQuartzTrigger( job );
 
-                                sched.ScheduleJob( jobDetail, jobTrigger );
+                                // Schedule the job (unless the cron expression is set to never run for an on-demand job like rebuild streaks)
+                                if ( job.CronExpression != ServiceJob.NeverScheduledCronExpression )
+                                {
+                                    sched.ScheduleJob( jobDetail, jobTrigger );
+                                }
 
                                 //// if the last status was an error, but we now loaded successful, clear the error
                                 // also, if the last status was 'Running', clear that status because it would have stopped if the app restarted
@@ -466,8 +471,7 @@ namespace RockWeb
         /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
         protected void Application_BeginRequest( object sender, EventArgs e )
         {
-            Context.Items.Add( "Request_Start_Time", RockDateTime.Now );
-            Context.Items.Add( "Cache_Hits", new Dictionary<string, bool>() );
+            Context.Items.AddOrReplace( "Request_Start_Time", RockDateTime.Now );
         }
 
         /// <summary>
@@ -1109,7 +1113,7 @@ namespace RockWeb
 
                             if ( recipients.Any() )
                             {
-                                var message = new RockEmailMessage( Rock.SystemGuid.SystemEmail.CONFIG_EXCEPTION_NOTIFICATION.AsGuid() );
+                                var message = new RockEmailMessage( Rock.SystemGuid.SystemCommunication.CONFIG_EXCEPTION_NOTIFICATION.AsGuid() );
                                 message.SetRecipients( recipients );
                                 message.Send();
                             }
@@ -1170,26 +1174,7 @@ namespace RockWeb
             if ( !Global.QueueInUse )
             {
                 Global.QueueInUse = true;
-
-                while ( RockQueue.TransactionQueue.Count != 0 )
-                {
-                    ITransaction transaction;
-                    if ( RockQueue.TransactionQueue.TryDequeue( out transaction ) )
-                    {
-                        if ( transaction != null )
-                        {
-                            try
-                            {
-                                transaction.Execute();
-                            }
-                            catch ( Exception ex )
-                            {
-                                LogError( new Exception( string.Format( "Exception in Global.DrainTransactionQueue(): {0}", transaction.GetType().Name ), ex ), null );
-                            }
-                        }
-                    }
-                }
-
+                RockQueue.Drain( ( ex ) => LogError( ex, null ) );
                 Global.QueueInUse = false;
             }
         }

@@ -364,7 +364,8 @@ namespace Rock.Plugin.HotFixes {
                 return ResourceManager.GetString("_050_MigrationRollupsForV7_4_spAnalytics_ETL_Campus", resourceCulture);
             }
         }
-        
+
+#pragma warning disable CS1570, CS1587
         /// <summary>
         ///   Looks up a localized string similar to 
         ////*
@@ -383,6 +384,7 @@ namespace Rock.Plugin.HotFixes {
         /// &lt;code&gt;
         ///   [rest of string was truncated]&quot;;.
         /// </summary>
+#pragma warning restore CS1570, CS1587
         public static string _050_MigrationRollupsForV7_4_spCrm_PersonDuplicateFinder {
             get {
                 return ResourceManager.GetString("_050_MigrationRollupsForV7_4_spCrm_PersonDuplicateFinder", resourceCulture);
@@ -662,18 +664,33 @@ namespace Rock.Plugin.HotFixes {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to UPDATE [LavaShortCode]
-        ///	SET [Documentation] = 
-        ///  &apos;&lt;p&gt;
-        ///    Adding dynamic charts to a page can be difficult, even for an experienced Javascript developer. The 
-        ///    chart shortcode allows anyone to create charts with just a few lines of Lava. There are two modes for 
-        ///    creating a chart. The first ‘simple’ mode creates a chart with a single series. This option will suffice 
-        ///    for most of your charting needs. The second ‘series’ option allows you to create charts with multiple 
-        ///    series. Let’s look [rest of string was truncated]&quot;;.
+        ///   Looks up a localized string similar to UPDATE [LavaShortcode] SET [Parameters]=N&apos;fillcolor^rgba(5,155,255,.6)|bordercolor^#059BFF|borderwidth^0|legendposition^bottom|legendshow^false|chartheight^400px|chartwidth^100%|tooltipshow^true|fontcolor^#777|fontfamily^sans-serif|tooltipbackgroundcolor^#000|type^bar|pointradius^3|pointcolor^#059BFF|pointbordercolor^#059BFF|pointborderwidth^0|pointhovercolor^rgba(5,155,255,.6)|pointhoverbordercolor^rgba(5,155,255,.6)|borderdash^|curvedlines^true|filllinearea^false|labels^|tooltipfontcolor^#fff|pointhoverra [rest of string was truncated]&quot;;.
         /// </summary>
-        public static string _082_MigrationRollupsForV9_0_6_SegmentedChartUpdate {
+        public static string _096_MigrationRollupsForV9_5_chartjsfix {
             get {
-                return ResourceManager.GetString("_082_MigrationRollupsForV9_0_6_SegmentedChartUpdate", resourceCulture);
+                return ResourceManager.GetString("_096_MigrationRollupsForV9_5_chartjsfix", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to /*
+        ///&lt;doc&gt;
+        ///	&lt;summary&gt;
+        /// 		This stored procedure returns a data set used by the Rock eRA job to add/remove
+        ///		people from being an eRA. It should not be modified as it will be updated in the
+        ///		future to meet additional requirements.
+        ///
+        ///		The goal of the query is to return both those that meet the eRA requirements as well
+        ///		as those that are marked as already being an eRA and the criteria to ensure that
+        ///		they still should be an era.
+        ///	&lt;/summary&gt;
+        ///	
+        ///	&lt;remarks&gt;	
+        ///		For eRA we only consider adults for the c [rest of string was truncated]&quot;;.
+        /// </summary>
+        public static string _097_FamilyAnalyticsProcChange_spCrm_FamilyAnalyticsEraDataset {
+            get {
+                return ResourceManager.GetString("_097_FamilyAnalyticsProcChange_spCrm_FamilyAnalyticsEraDataset", resourceCulture);
             }
         }
     }

@@ -18,6 +18,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 
 using Rock.Data;
@@ -35,7 +36,7 @@ namespace Rock.Web.Cache
     {
         #region Static Fields
 
-        private static readonly ConcurrentDictionary<string, int> EntityTypes = new ConcurrentDictionary<string, int>();
+        private static readonly ConcurrentDictionary<string, int> EntityTypes = new ConcurrentDictionary<string, int>( StringComparer.OrdinalIgnoreCase );
 
         #endregion
 
@@ -94,6 +95,32 @@ namespace Rock.Web.Cache
         /// </value>
         [DataMember]
         internal int? SingleValueFieldTypeId { get; private set; }
+
+        /// <summary>
+        /// The properties
+        /// </summary>
+        [IgnoreDataMember]
+        private Dictionary<string, PropertyInfo> _properties = null;
+
+        /// <summary>
+        /// Gets a dictionary of the names of all the properties for this type of entity, along with <see cref="PropertyInfo"/> about the property
+        /// </summary>
+        /// <value>
+        /// The properties.
+        /// </value>
+        [IgnoreDataMember]
+        public Dictionary<string, PropertyInfo> Properties
+        {
+            get
+            {
+                if ( _properties == null )
+                {
+                    _properties = this.GetEntityType().GetProperties().ToDictionary( k => k.Name, v => v );
+                }
+
+                return _properties;
+            }
+        }
 
         /// <summary>
         /// Gets the type of the single value field.
@@ -445,7 +472,7 @@ namespace Rock.Web.Cache
         }
 
         /// <summary>
-        /// Gets the id.
+        /// Gets an EntityTypeId based on the specified type name.
         /// </summary>
         /// <param name="name">The name.</param>
         /// <returns></returns>

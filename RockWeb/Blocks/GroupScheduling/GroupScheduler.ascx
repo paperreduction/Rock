@@ -4,7 +4,7 @@
     <ContentTemplate>
         <asp:Panel ID="pnlView" runat="server" CssClass="panel panel-block panel-groupscheduler">
             <%-- Panel Header --%>
-            <div class="panel-heading panel-follow">
+            <div class="panel-heading">
                 <h1 class="panel-title">
                     <i class="fa fa-calendar-alt"></i>
                     Group Scheduler
@@ -29,7 +29,6 @@
                         Auto Schedule
                     </asp:LinkButton>
                 </div>
-                <div class="rock-fullscreen-toggle js-fullscreen-trigger"></div>
             </div>
 
             <%-- Panel Body --%>
@@ -121,15 +120,14 @@
                                                 </div>
                                             </div>
 
+                                            <div class="js-add-resource-picker margin-all-sm" style="display: none">
+                                                <Rock:PersonPicker ID="ppAddPerson" runat="server" Label="Select Person" OnSelectPerson="ppAddPerson_SelectPerson" />
+                                            </div>
+
                                             <div class="panel-body padding-all-none">
-
-                                                <div class="js-add-resource-picker margin-all-sm" style="display: none">
-                                                    <Rock:PersonPicker ID="ppAddPerson" runat="server" Label="Select Person" OnSelectPerson="ppAddPerson_SelectPerson" />
-                                                </div>
-
                                                 <Rock:RockTextBox ID="sfResource" runat="server" CssClass="resource-search padding-all-sm js-resource-search" PrependText="<i class='fa fa-search'></i>" Placeholder="Search" spellcheck="false" />
 
-                                                <div class="viewport">
+                                                <div class="scroll-list">
                                                     <%-- loading indicator --%>
                                                     <i class="fa fa-refresh fa-spin margin-l-md js-loading-notification" style="display: none; opacity: .4;"></i>
 

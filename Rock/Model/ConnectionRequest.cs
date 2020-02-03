@@ -18,11 +18,14 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data.Entity;
 using System.Data.Entity.Infrastructure;
 using System.Data.Entity.ModelConfiguration;
+using System.Linq;
 using System.Runtime.Serialization;
 
 using Rock.Data;
+using Rock.Web.Cache;
 
 namespace Rock.Model
 {
@@ -241,16 +244,56 @@ namespace Rock.Model
         #region Methods
 
         /// <summary>
+        /// A parent authority.  If a user is not specifically allowed or denied access to
+        /// this object, Rock will check the default authorization on the current type, and
+        /// then the authorization on the Rock.Security.GlobalDefault entity
+        /// </summary>
+        public override Security.ISecured ParentAuthority
+        {
+            get
+            {
+                return this.ConnectionOpportunity ?? base.ParentAuthority;
+            }
+        }
+
+        /// <summary>
         /// Pres the save changes.
         /// </summary>
         /// <param name="dbContext">The database context.</param>
         /// <param name="entry">The entry.</param>
-        public override void PreSaveChanges( DbContext dbContext, DbEntityEntry entry )
+        public override void PreSaveChanges( Rock.Data.DbContext dbContext, DbEntityEntry entry )
         {
             var transaction = new Rock.Transactions.ConnectionRequestChangeTransaction( entry );
             Rock.Transactions.RockQueue.TransactionQueue.Enqueue( transaction );
 
             base.PreSaveChanges( dbContext, entry );
+        }
+
+        /// <summary>
+        /// Get a list of all inherited Attributes that should be applied to this entity.
+        /// </summary>
+        /// <returns>A list of all inherited AttributeCache objects.</returns>
+        public override List<AttributeCache> GetInheritedAttributes( Rock.Data.RockContext rockContext )
+        {
+            var connectionOpportunity = this.ConnectionOpportunity;
+            if ( connectionOpportunity == null && this.ConnectionOpportunityId > 0 )
+            {
+                connectionOpportunity = new ConnectionOpportunityService( rockContext )
+                    .Queryable().AsNoTracking()
+                    .FirstOrDefault( g => g.Id == this.ConnectionOpportunityId );
+            }
+
+            if ( connectionOpportunity != null )
+            {
+                var connectionType = connectionOpportunity.ConnectionType;
+
+                if ( connectionType != null )
+                {
+                    return connectionType.GetInheritedAttributesForQualifier( rockContext, TypeId, "ConnectionTypeId" );
+                }
+            }
+
+            return null;
         }
 
         #endregion

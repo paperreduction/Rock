@@ -95,7 +95,7 @@ namespace RockWeb.Blocks.CheckIn
         category: "",
         order: 5,
         key: AttributeKeys.CheckinDetailPage )]
-    
+
     [DefinedValueField(
         definedTypeGuid: Rock.SystemGuid.DefinedType.CHART_STYLES,
         name: "Chart Style",
@@ -177,7 +177,7 @@ namespace RockWeb.Blocks.CheckIn
 
     public partial class AttendanceAnalytics : RockBlock
     {
-        protected static class AttributeKeys
+        private static class AttributeKeys
         {
             public const string GroupTypes = "GroupTypes";
             public const string IncludeInactiveCampuses = "IncludeInactiveCampuses";
@@ -1122,7 +1122,7 @@ function(item) {
             string campusIds = GetAttributeValue( AttributeKeys.ShowCampusFilter ).AsBoolean() ? clbCampuses.SelectedValues.AsDelimited( "," ) : string.Empty;
             var dataView = dvpDataView.SelectedValueAsInt();
             var scheduleIds = GetAttributeValue( AttributeKeys.ShowScheduleFilter ).AsBoolean() ? spSchedules.SelectedValues.ToList().AsDelimited( "," ) : string.Empty;
-            
+
             var chartData = new AttendanceService( _rockContext ).GetChartData( groupBy, graphBy, start, end, groupIds, campusIds, dataView, scheduleIds );
 
             return chartData;
@@ -2258,18 +2258,20 @@ function(item) {
 
                     string repeatDirection = GetAttributeValue( AttributeKeys.FilterColumnDirection );
                     int repeatColumns = GetAttributeValue( AttributeKeys.FilterColumnCount ).AsIntegerOrNull() ?? 0;
-                    
+
                     cblGroupTypeGroups.RepeatDirection = repeatDirection == "vertical" ? RepeatDirection.Vertical : RepeatDirection.Horizontal;
                     cblGroupTypeGroups.RepeatColumns = repeatDirection == "horizontal" ? repeatColumns : 0;
                     cblGroupTypeGroups.Label = groupType.Name;
                     cblGroupTypeGroups.Items.Clear();
 
-                    // limit to Groups that don't have a Parent, or the ParentGroup is a different grouptype so we don't end up with infinite recursion
-                    foreach ( var group in groupType.Groups
-                        .Where( g => !g.ParentGroupId.HasValue || ( g.ParentGroup.GroupTypeId != groupType.Id ) )
+                    // Select only those Groups that don't have a Parent, or the ParentGroup is a different group type so we don't end up with an infinite recursion.
+                    var eligibleGroups = groupType.Groups
+                        .Where( g => ( g.ParentGroup == null ) || ( g.ParentGroup.GroupTypeId != groupType.Id ) )
                         .OrderBy( a => a.Order )
                         .ThenBy( a => a.Name )
-                        .ToList() )
+                        .ToList();
+
+                    foreach ( var group in eligibleGroups )
                     {
                         if ( group.IsActive || showInactive )
                         {
@@ -2324,9 +2326,12 @@ function(item) {
                         checkBoxList.Items.Add( new ListItem( displayName, group.Id.ToString() ) );
                     }
 
+                    bool showInactive = GetUserPreference( BlockCache.Guid.ToString() + "_showInactive" ).AsBoolean();
+
                     if ( group.Groups != null )
                     {
                         foreach ( var childGroup in group.Groups
+                            .Where( a => a.IsActive || showInactive )
                             .OrderBy( a => a.Order )
                             .ThenBy( a => a.Name )
                             .ToList() )
