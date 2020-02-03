@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Xml.Linq;
@@ -46,7 +47,8 @@ namespace Rock.NMI
     [TextField( "Admin Password", "The password of an NMI user", true, "", "", 2, "AdminPassword", true )]
     [TextField( "Three Step API URL", "The URL of the NMI Three Step API", true, "https://secure.networkmerchants.com/api/v2/three-step", "", 3, "APIUrl" )]
     [TextField( "Query API URL", "The URL of the NMI Query API", true, "https://secure.networkmerchants.com/api/query.php", "", 4, "QueryUrl" )]
-    [BooleanField( "Prompt for Name On Card", "Should users be prompted to enter name on the card", false, "", 5, "PromptForName" )]
+    [TextField( "Direct Post API URL", "The URL of the NMI Direct Post Query API", true, "https://secure.nmi.com/api/transact.php", "", 5, "DirectPostAPIUrl" )]
+    [BooleanField( "Prompt for Name On Card", "Should users be prompted to enter name on the card", false, "", 6, "PromptForName" )]
     [BooleanField( "Prompt for Billing Address", "Should users be prompted to enter billing address", false, "", 7, "PromptForAddress" )]
     public class Gateway : GatewayComponent, IThreeStepGatewayComponent
     {
@@ -600,20 +602,190 @@ namespace Rock.NMI
         /// <returns></returns>
         public override bool UpdateScheduledPaymentSupported
         {
-            get { return false; }
+            get { return true; }
         }
 
         /// <summary>
         /// Updates the scheduled payment.
         /// </summary>
-        /// <param name="transaction">The transaction.</param>
+        /// <param name="financialScheduledTransaction">The financial scheduled transaction.</param>
         /// <param name="paymentInfo">The payment info.</param>
         /// <param name="errorMessage">The error message.</param>
         /// <returns></returns>
-        public override bool UpdateScheduledPayment( FinancialScheduledTransaction transaction, PaymentInfo paymentInfo, out string errorMessage )
+        public override bool UpdateScheduledPayment( FinancialScheduledTransaction scheduledTransaction, PaymentInfo paymentInfo, out string errorMessage )
         {
-            errorMessage = "The payment gateway associated with this scheduled transaction (NMI) does not support updating an existing scheduled transaction. A new scheduled transaction should be created instead.";
-            return false;
+            /*** MP: 2020-02-03
+             *  NMI Update Scheduled Payment is implemented using add_subscription/delete_subscription. NMI does have an 'update-subscription',
+             *  but that only allows an update of customer address information (not amount or frequency),
+             *  When doing the 'add_subscription', we'll use the subscription_id of the original transaction as 'source_transaction_id'.
+             *  NMI will use this to associate customer vault (payment info) for the new subscription.
+             */
+
+            errorMessage = string.Empty;
+
+            if ( scheduledTransaction?.GatewayScheduleId.IsNullOrWhiteSpace() == true )
+            {
+                errorMessage = "GatewayScheduleId must not be blank";
+            }
+
+            var rockContext = new RockContext();
+
+            FinancialGateway financialGateway = null;
+            if ( scheduledTransaction.FinancialGatewayId.HasValue )
+            {
+                financialGateway = new FinancialGatewayService( rockContext ).Get( scheduledTransaction.FinancialGatewayId.Value );
+            }
+
+            if ( financialGateway == null )
+            {
+                throw new ArgumentNullException( "FinancialGateway must have a value" );
+            }
+
+            var scheduleTransactionFrequencyValueGuid = DefinedValueCache.Get( scheduledTransaction.TransactionFrequencyValueId ).Guid;
+
+            var addSubscriptionQueryParameters = new Dictionary<string, string>();
+
+            // Set the schedule parameters using the same implementation as GetPlan, but in query params instead of XML
+            addSubscriptionQueryParameters.Add( "recurring", "add_subscription" );
+            addSubscriptionQueryParameters.Add( "plan_amount", paymentInfo.Amount.ToString() );
+            addSubscriptionQueryParameters.Add( "start_date", scheduledTransaction.StartDate.ToString( "yyyyMMdd" ) );
+            addSubscriptionQueryParameters.Add( "plan_payments", "0" );
+
+            int startDayOfMonth = scheduledTransaction.StartDate.Day;
+
+            if ( scheduleTransactionFrequencyValueGuid == Rock.SystemGuid.DefinedValue.TRANSACTION_FREQUENCY_MONTHLY.AsGuid() )
+            {
+                addSubscriptionQueryParameters.Add( "month_frequency", "1" );
+                addSubscriptionQueryParameters.Add( "day_of_month", startDayOfMonth.ToString() );
+            }
+            else if ( scheduleTransactionFrequencyValueGuid == Rock.SystemGuid.DefinedValue.TRANSACTION_FREQUENCY_WEEKLY.AsGuid() )
+            {
+                addSubscriptionQueryParameters.Add( "day_frequency", "7" );
+            }
+            else if ( scheduleTransactionFrequencyValueGuid == Rock.SystemGuid.DefinedValue.TRANSACTION_FREQUENCY_BIWEEKLY.AsGuid() )
+            {
+                addSubscriptionQueryParameters.Add( "day_frequency", "14" );
+            }
+            else if ( scheduleTransactionFrequencyValueGuid == Rock.SystemGuid.DefinedValue.TRANSACTION_FREQUENCY_ONE_TIME.AsGuid() )
+            {
+                // Make sure number of payments is set to 1 for one-time future payments
+                addSubscriptionQueryParameters.Add( "plan_payments", "1" );
+                addSubscriptionQueryParameters.Add( "month_frequency", "12" );
+                addSubscriptionQueryParameters.Add( "day_of_month", startDayOfMonth.ToString() );
+            }
+
+            var originalGatewayScheduleId = scheduledTransaction.GatewayScheduleId;
+
+            addSubscriptionQueryParameters.Add( "source_transaction_id", originalGatewayScheduleId );
+
+            var addSubscriptionResult = PostToGatewayDirectPostAPI( scheduledTransaction.FinancialGateway, addSubscriptionQueryParameters );
+
+            if ( addSubscriptionResult == null )
+            {
+                errorMessage = "Invalid Response from NMI!";
+                return false;
+            }
+
+            string addSubscriptionResultCodeMessage = GetResultCodeMessage( addSubscriptionResult );
+
+            // response in the form of response=3&responsetext=Plan Payments is required REFID:123456789&authcode=&transactionid=&avsresponse=&cvvresponse=&orderid=&type=&response_code=300&customer_vault_id=
+
+            if ( addSubscriptionResult.GetValueOrNull( "response_code" ) != "100" )
+            {
+                errorMessage = addSubscriptionResultCodeMessage;
+                return false;
+            }
+
+            scheduledTransaction.GatewayScheduleId = addSubscriptionResult.GetValueOrNull( "transactionid" );
+            if ( scheduledTransaction.GatewayScheduleId.IsNullOrWhiteSpace() )
+            {
+                throw new Exception( $"add_subscription result does not include GatewayScheduleId. {addSubscriptionResult.ToJson()}" );
+            }
+
+            var deleteSubscriptionQueryParameters = new Dictionary<string, string>();
+            deleteSubscriptionQueryParameters.Add( "recurring", "delete_subscription" );
+            deleteSubscriptionQueryParameters.Add( "subscription_id", originalGatewayScheduleId );
+
+            var deleteSubscriptionResult = PostToGatewayDirectPostAPI( scheduledTransaction.FinancialGateway, deleteSubscriptionQueryParameters );
+
+            //if ( deleteSubscriptionResult.GetValueOrNull("response_code") )
+
+            string deleteSubscriptionResultCodeMessage = GetResultCodeMessage( addSubscriptionResult );
+
+            if ( deleteSubscriptionResult.GetValueOrNull( "response_code" ) != "100" )
+            {
+                errorMessage = deleteSubscriptionResultCodeMessage;
+                throw new Exception( $"add_subscription succeeded, but delete_subscription failed. Use Gateway Admin portal to see what happened -  Original GatewayScheduleId={originalGatewayScheduleId}: {addSubscriptionResult.ToJson()}" );
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Posts to gateway.
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <param name="data">The data.</param>
+        /// <returns></returns>
+        /// <exception cref="System.Exception"></exception>
+        private Dictionary<string, string> PostToGatewayDirectPostAPI( FinancialGateway financialGateway, Dictionary<string, string> queryParameters )
+        {
+            var restClient = new RestClient( "https://secure.nmi.com/api/transact.php" );// GetAttributeValue( financialGateway, "DirectPostAPIUrl" ) ?? "https://secure.nmi.com/api/transact.php" );
+
+            var restRequest = new RestRequest( Method.POST );
+            restRequest.RequestFormat = DataFormat.Xml;
+            foreach ( var queryParameter in queryParameters )
+            {
+                restRequest.AddQueryParameter( queryParameter.Key, queryParameter.Value );
+            }
+
+            restRequest.AddParameter( "username", GetAttributeValue( financialGateway, "AdminUsername" ) );
+            restRequest.AddParameter( "password", GetAttributeValue( financialGateway, "AdminPassword" ) );
+
+            try
+            {
+                var response = restClient.Execute( restRequest );
+                var xdocResult = GetXmlResponse( response );
+                if ( xdocResult != null )
+                {
+                    // Convert XML result to a dictionary
+                    var result = new Dictionary<string, string>();
+                    foreach ( XElement element in xdocResult.Root.Elements() )
+                    {
+                        if ( element.HasElements )
+                        {
+                            string prefix = element.Name.LocalName;
+                            foreach ( XElement childElement in element.Elements() )
+                            {
+                                result.AddOrIgnore( prefix + "_" + childElement.Name.LocalName, childElement.Value.Trim() );
+                            }
+                        }
+                        else
+                        {
+                            result.AddOrIgnore( element.Name.LocalName, element.Value.Trim() );
+                        }
+                    }
+
+                    return result;
+                }
+                else
+                {
+                    // response in the form of response=3&responsetext=Plan Payments is required REFID:123456789&authcode=&transactionid=&avsresponse=&cvvresponse=&orderid=&type=&response_code=300&customer_vault_id=
+                    // so convert this to a dictionary
+                    var result = response?.Content?.Split( '&' ).ToList().Select( s => s.Split( '=' ) ).Where( a => a.Length == 2 ).ToDictionary( k => k[0], v => v[1] );
+
+                    return result;
+                }
+            }
+            catch ( WebException webException )
+            {
+                string message = GetResponseMessage( webException.Response.GetResponseStream() );
+                throw new Exception( webException.Message + " - " + message );
+            }
+            catch ( Exception ex )
+            {
+                throw ex;
+            }
         }
 
         /// <summary>
@@ -1041,7 +1213,13 @@ namespace Rock.NMI
         /// <returns></returns>
         private string GetResultCodeMessage( Dictionary<string, string> result )
         {
-            switch ( result.GetValueOrNull( "result-code" ).AsInteger() )
+            int? resultCode = result.GetValueOrNull( "result-code" ).AsIntegerOrNull();
+            if (!resultCode.HasValue)
+            {
+                resultCode = result.GetValueOrNull( "response-code" ).AsIntegerOrNull();
+            }
+
+            switch ( resultCode ?? 0 )
             {
                 case 100:
                     {
