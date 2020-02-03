@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Xml.Linq;
@@ -41,15 +42,80 @@ namespace Rock.NMI
     [Export( typeof( GatewayComponent ) )]
     [ExportMetadata( "ComponentName", "NMI Gateway" )]
 
-    [TextField( "Security Key", "The API key", true, "", "", 0 )]
-    [TextField( "Admin Username", "The username of an NMI user", true, "", "", 1 )]
-    [TextField( "Admin Password", "The password of an NMI user", true, "", "", 2, "AdminPassword", true )]
-    [TextField( "Three Step API URL", "The URL of the NMI Three Step API", true, "https://secure.networkmerchants.com/api/v2/three-step", "", 3, "APIUrl" )]
-    [TextField( "Query API URL", "The URL of the NMI Query API", true, "https://secure.networkmerchants.com/api/query.php", "", 4, "QueryUrl" )]
-    [BooleanField( "Prompt for Name On Card", "Should users be prompted to enter name on the card", false, "", 5, "PromptForName" )]
-    [BooleanField( "Prompt for Billing Address", "Should users be prompted to enter billing address", false, "", 7, "PromptForAddress" )]
+    [TextField(
+        "Security Key",
+        Key = AttributeKey.SecurityKey,
+        Description = "The API key",
+        IsRequired = true,
+        Order = 0
+        )]
+
+    [TextField(
+        "Admin Username",
+        Key = AttributeKey.AdminUsername,
+        Description = "The username of an NMI user",
+        IsRequired = true,
+        Order = 1 )]
+
+    [TextField( "Admin Password",
+        Key = AttributeKey.AdminPassword,
+        Description = "The password of the NMI user",
+        IsRequired = true,
+        IsPassword = true,
+        Order = 2 )]
+
+    [TextField(
+        "Three Step API URL",
+        Key = AttributeKey.ThreeStepAPIURL,
+        Description = "The URL of the NMI Three Step API",
+        IsRequired = true,
+        DefaultValue = "https://secure.networkmerchants.com/api/v2/three-step",
+        Order = 3 )]
+
+    [TextField(
+        "Query API URL",
+        Key = AttributeKey.QueryUrl,
+        Description = "The URL of the NMI Query API",
+        IsRequired = true,
+        DefaultValue = "https://secure.networkmerchants.com/api/query.php",
+        Order = 4 )]
+
+    [BooleanField(
+        "Prompt for Name On Card",
+        Key = AttributeKey.PromptForName,
+        Description = "Should users be prompted to enter name on the card",
+        DefaultBooleanValue = false,
+        Order = 6 )]
+
+    [BooleanField(
+        "Prompt for Billing Address",
+        Key = AttributeKey.PromptForAddress,
+        Description = "Should users be prompted to enter billing address",
+        DefaultBooleanValue = false,
+        Order = 7 )]
     public class Gateway : GatewayComponent, IThreeStepGatewayComponent
     {
+        #region Attribute Keys
+
+        /// <summary>;
+        /// Keys to use for Component Attributes
+        /// </summary>
+        protected static class AttributeKey
+        {
+            public const string SecurityKey = "SecurityKey";
+            public const string AdminUsername = "AdminUsername";
+            public const string AdminPassword = "AdminPassword";
+
+            // NOTE: Lets call this ThreeStepAPIUrl but keep "APIUrl" for backwards compatibility 
+            public const string ThreeStepAPIURL = "APIUrl";
+
+            public const string QueryUrl = "QueryUrl";
+            public const string DirectPostAPIUrl = "DirectPostAPIUrl";
+            public const string PromptForName = "PromptForName";
+            public const string PromptForAddress = "PromptForAddress";
+        }
+
+        #endregion Attribute Keys
 
         #region Gateway Component Implementation
 
@@ -75,7 +141,7 @@ namespace Rock.NMI
         /// </value>
         public override bool PromptForNameOnCard( FinancialGateway financialGateway )
         {
-            return GetAttributeValue( financialGateway, "PromptForName" ).AsBoolean();
+            return GetAttributeValue( financialGateway, AttributeKey.PromptForName ).AsBoolean();
         }
 
         /// <summary>
@@ -110,7 +176,7 @@ namespace Rock.NMI
         /// </value>
         public override bool PromptForBillingAddress( FinancialGateway financialGateway )
         {
-            return GetAttributeValue( financialGateway, "PromptForAddress" ).AsBoolean();
+            return GetAttributeValue( financialGateway, AttributeKey.PromptForAddress ).AsBoolean();
         }
 
         /// <summary>
@@ -198,7 +264,7 @@ namespace Rock.NMI
                     new XElement( "tax-amount", "0.00" ),
                     new XElement( "shipping-amount", "0.00" ) );
 
-                bool isReferencePayment = ( paymentInfo is ReferencePaymentInfo );
+                bool isReferencePayment = paymentInfo is ReferencePaymentInfo;
                 if ( isReferencePayment )
                 {
                     var reference = paymentInfo as ReferencePaymentInfo;
@@ -222,7 +288,7 @@ namespace Rock.NMI
                 rootElement.Add( GetBilling( paymentInfo ) );
 
                 XDocument xdoc = new XDocument( new XDeclaration( "1.0", "UTF-8", "yes" ), rootElement );
-                var result = PostToGateway( financialGateway, xdoc );
+                var result = PostToGatewayThreeStepAPI( financialGateway, xdoc );
 
                 if ( result == null )
                 {
@@ -237,22 +303,18 @@ namespace Rock.NMI
                 }
 
                 return result.GetValueOrNull( "form-url" );
-
             }
-
             catch ( WebException webException )
             {
                 string message = GetResponseMessage( webException.Response.GetResponseStream() );
                 errorMessage = webException.Message + " - " + message;
                 return null;
             }
-
             catch ( Exception ex )
             {
                 errorMessage = ex.Message;
                 return null;
             }
-
         }
 
         /// <summary>
@@ -271,7 +333,7 @@ namespace Rock.NMI
                 var rootElement = GetRoot( financialGateway, "complete-action" );
                 rootElement.Add( new XElement( "token-id", resultQueryString.Substring( 10 ) ) );
                 XDocument xdoc = new XDocument( new XDeclaration( "1.0", "UTF-8", "yes" ), rootElement );
-                var result = PostToGateway( financialGateway, xdoc );
+                var result = PostToGatewayThreeStepAPI( financialGateway, xdoc );
 
                 if ( result == null )
                 {
@@ -333,20 +395,17 @@ namespace Rock.NMI
 
                 return transaction;
             }
-
             catch ( WebException webException )
             {
                 string message = GetResponseMessage( webException.Response.GetResponseStream() );
                 errorMessage = webException.Message + " - " + message;
                 return null;
             }
-
             catch ( Exception ex )
             {
                 errorMessage = ex.Message;
                 return null;
             }
-
         }
 
         /// <summary>
@@ -370,7 +429,7 @@ namespace Rock.NMI
                 rootElement.Add( new XElement( "amount", amount.ToString( "0.00" ) ) );
 
                 XDocument xdoc = new XDocument( new XDeclaration( "1.0", "UTF-8", "yes" ), rootElement );
-                var result = PostToGateway( origTransaction.FinancialGateway, xdoc );
+                var result = PostToGatewayThreeStepAPI( origTransaction.FinancialGateway, xdoc );
 
                 if ( result == null )
                 {
@@ -438,7 +497,7 @@ namespace Rock.NMI
                     new XElement( "currency", "USD" ),
                     new XElement( "tax-amount", "0.00" ) );
 
-                bool isReferencePayment = ( paymentInfo is ReferencePaymentInfo );
+                bool isReferencePayment = paymentInfo is ReferencePaymentInfo;
                 if ( isReferencePayment )
                 {
                     var reference = paymentInfo as ReferencePaymentInfo;
@@ -459,7 +518,7 @@ namespace Rock.NMI
                 rootElement.Add( GetBilling( paymentInfo ) );
 
                 XDocument xdoc = new XDocument( new XDeclaration( "1.0", "UTF-8", "yes" ), rootElement );
-                var result = PostToGateway( financialGateway, xdoc );
+                var result = PostToGatewayThreeStepAPI( financialGateway, xdoc );
 
                 if ( result == null )
                 {
@@ -475,20 +534,17 @@ namespace Rock.NMI
 
                 return result.GetValueOrNull( "form-url" );
             }
-
             catch ( WebException webException )
             {
                 string message = GetResponseMessage( webException.Response.GetResponseStream() );
                 errorMessage = webException.Message + " - " + message;
                 return null;
             }
-
             catch ( Exception ex )
             {
                 errorMessage = ex.Message;
                 return null;
             }
-
         }
 
         /// <summary>
@@ -508,7 +564,7 @@ namespace Rock.NMI
                 var rootElement = GetRoot( financialGateway, "complete-action" );
                 rootElement.Add( new XElement( "token-id", resultQueryString.Substring( 10 ) ) );
                 XDocument xdoc = new XDocument( new XDeclaration( "1.0", "UTF-8", "yes" ), rootElement );
-                var result = PostToGateway( financialGateway, xdoc );
+                var result = PostToGatewayThreeStepAPI( financialGateway, xdoc );
 
                 if ( result == null )
                 {
@@ -556,21 +612,17 @@ namespace Rock.NMI
 
                 return scheduledTransaction;
             }
-
             catch ( WebException webException )
             {
                 string message = GetResponseMessage( webException.Response.GetResponseStream() );
                 errorMessage = webException.Message + " - " + message;
                 return null;
             }
-
             catch ( Exception ex )
             {
                 errorMessage = ex.Message;
                 return null;
             }
-
-
         }
 
         /// <summary>
@@ -634,7 +686,7 @@ namespace Rock.NMI
                 rootElement.Add( new XElement( "subscription-id", transaction.GatewayScheduleId ) );
 
                 XDocument xdoc = new XDocument( new XDeclaration( "1.0", "UTF-8", "yes" ), rootElement );
-                var result = PostToGateway( transaction.FinancialGateway, xdoc );
+                var result = PostToGatewayThreeStepAPI( transaction.FinancialGateway, xdoc );
 
                 if ( result == null )
                 {
@@ -679,11 +731,11 @@ namespace Rock.NMI
             errorMessage = string.Empty;
             var financialGateway = new FinancialGatewayService( new RockContext() ).Get( transaction.FinancialGatewayId.Value );
 
-            var restClient = new RestClient( GetAttributeValue( financialGateway, "QueryUrl" ) );
+            var restClient = new RestClient( GetAttributeValue( financialGateway, AttributeKey.QueryUrl ) );
             var restRequest = new RestRequest( Method.GET );
 
-            restRequest.AddParameter( "username", GetAttributeValue( financialGateway, "AdminUsername" ) );
-            restRequest.AddParameter( "password", GetAttributeValue( financialGateway, "AdminPassword" ) );
+            restRequest.AddParameter( "username", GetAttributeValue( financialGateway, AttributeKey.AdminUsername ) );
+            restRequest.AddParameter( "password", GetAttributeValue( financialGateway, AttributeKey.AdminPassword ) );
             restRequest.AddParameter( "report_type", "recurring" );
             restRequest.AddParameter( "subscription_id", transaction.GatewayScheduleId );
 
@@ -738,11 +790,11 @@ namespace Rock.NMI
 
             var txns = new List<Payment>();
 
-            var restClient = new RestClient( GetAttributeValue( financialGateway, "QueryUrl" ) );
+            var restClient = new RestClient( GetAttributeValue( financialGateway, AttributeKey.QueryUrl ) );
             var restRequest = new RestRequest( Method.GET );
 
-            restRequest.AddParameter( "username", GetAttributeValue( financialGateway, "AdminUsername" ) );
-            restRequest.AddParameter( "password", GetAttributeValue( financialGateway, "AdminPassword" ) );
+            restRequest.AddParameter( "username", GetAttributeValue( financialGateway, AttributeKey.AdminUsername ) );
+            restRequest.AddParameter( "password", GetAttributeValue( financialGateway, AttributeKey.AdminPassword ) );
             restRequest.AddParameter( "start_date", startDate.ToString( "yyyyMMddHHmmss" ) );
             restRequest.AddParameter( "end_date", endDate.ToString( "yyyyMMddHHmmss" ) );
 
@@ -786,9 +838,13 @@ namespace Rock.NMI
 
                                         if ( actionDate.HasValue )
                                         {
-                                            statusMessage.AppendFormat( "{0} {1}: {2}; Status: {3}",
-                                                actionDate.Value.ToShortDateString(), actionDate.Value.ToShortTimeString(),
-                                                actionType.FixCase(), responseText );
+                                            statusMessage.AppendFormat(
+                                                "{0} {1}: {2}; Status: {3}",
+                                                actionDate.Value.ToShortDateString(),
+                                                actionDate.Value.ToShortTimeString(),
+                                                actionType.FixCase(),
+                                                responseText );
+
                                             statusMessage.AppendLine();
                                         }
 
@@ -819,7 +875,6 @@ namespace Rock.NMI
                                         txns.Add( payment );
                                     }
                                 }
-
                             }
                         }
                         else
@@ -878,9 +933,8 @@ namespace Rock.NMI
         /// <returns></returns>
         private XElement GetRoot( FinancialGateway financialGateway, string elementName )
         {
-            XElement rootElement = new XElement( elementName,
-                new XElement( "api-key", GetAttributeValue( financialGateway, "SecurityKey" ) )
-            );
+            XElement apiKeyElement = new XElement( "api-key", GetAttributeValue( financialGateway, AttributeKey.SecurityKey ) );
+            XElement rootElement = new XElement( elementName, apiKeyElement );
 
             return rootElement;
         }
@@ -899,7 +953,8 @@ namespace Rock.NMI
                 paymentInfo.FirstName = "-";
             }
 
-            XElement billingElement = new XElement( "billing",
+            XElement billingElement = new XElement(
+                "billing",
                 new XElement( "first-name", paymentInfo.FirstName ),
                 new XElement( "last-name", paymentInfo.LastName ),
                 new XElement( "address1", paymentInfo.Street1 ),
@@ -909,8 +964,7 @@ namespace Rock.NMI
                 new XElement( "postal", paymentInfo.PostalCode ),
                 new XElement( "country", paymentInfo.Country ),
                 new XElement( "phone", paymentInfo.Phone ),
-                new XElement( "email", paymentInfo.Email )
-            );
+                new XElement( "email", paymentInfo.Email ) );
 
             if ( paymentInfo is ACHPaymentInfo )
             {
@@ -938,7 +992,8 @@ namespace Rock.NMI
                 schedule.NumberOfPayments = 1;
             }
 
-            XElement planElement = new XElement( "plan",
+            XElement planElement = new XElement(
+                "plan",
                 new XElement( "payments", schedule.NumberOfPayments.HasValue ? schedule.NumberOfPayments.Value.ToString() : "0" ),
                 new XElement( "amount", paymentInfo.Amount.ToString() ) );
 
@@ -964,21 +1019,16 @@ namespace Rock.NMI
         }
 
         /// <summary>
-        /// Posts to gateway.
+        /// Posts to gateway using the 3-Step API.
+        /// https://secure.tnbcigateway.com/merchants/resources/integration/integration_portal.php?#3step_methodology
         /// </summary>
         /// <param name="financialGateway">The financial gateway.</param>
         /// <param name="data">The data.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        private Dictionary<string, string> PostToGateway( FinancialGateway financialGateway, XDocument data )
+        private Dictionary<string, string> PostToGatewayThreeStepAPI( FinancialGateway financialGateway, XDocument data )
         {
-            Debug.WriteLine( "REQUEST:" );
-            Debug.WriteLine( data.ToString() );
-            Debug.WriteLine("");
-            Debug.WriteLine( "" );
-            Debug.WriteLine( "" );
-
-            var restClient = new RestClient( GetAttributeValue( financialGateway, "APIUrl" ) );
+            var restClient = new RestClient( GetAttributeValue( financialGateway, AttributeKey.ThreeStepAPIURL ) );
             var restRequest = new RestRequest( Method.POST );
             restRequest.RequestFormat = DataFormat.Xml;
             restRequest.AddParameter( "text/xml", data.ToString(), ParameterType.RequestBody );
@@ -987,13 +1037,6 @@ namespace Rock.NMI
             {
                 var response = restClient.Execute( restRequest );
                 var xdocResult = GetXmlResponse( response );
-
-
-                Debug.WriteLine( "RESPONSE:" );
-                Debug.WriteLine( xdocResult.ToString() );
-                Debug.WriteLine( "" );
-                Debug.WriteLine( "" );
-                Debug.WriteLine( "" );
 
                 if ( xdocResult != null )
                 {
@@ -1014,6 +1057,7 @@ namespace Rock.NMI
                             result.AddOrIgnore( element.Name.LocalName, element.Value.Trim() );
                         }
                     }
+
                     return result;
                 }
             }
@@ -1028,7 +1072,6 @@ namespace Rock.NMI
             }
 
             return null;
-
         }
 
         /// <summary>
@@ -1061,54 +1104,67 @@ namespace Rock.NMI
                     {
                         return "Transaction was approved.";
                     }
+
                 case 200:
                     {
                         return "Transaction was declined by processor.";
                     }
+
                 case 201:
                     {
                         return "Do not honor.";
                     }
+
                 case 202:
                     {
                         return "Insufficient funds.";
                     }
+
                 case 203:
                     {
                         return "Over limit.";
                     }
+
                 case 204:
                     {
                         return "Transaction not allowed.";
                     }
+
                 case 220:
                     {
                         return "Incorrect payment information.";
                     }
+
                 case 221:
                     {
                         return "No such card issuer.";
                     }
+
                 case 222:
                     {
                         return "No card number on file with issuer.";
                     }
+
                 case 223:
                     {
                         return "Expired card.";
                     }
+
                 case 224:
                     {
                         return "Invalid expiration date.";
                     }
+
                 case 225:
                     {
                         return "Invalid card security code.";
                     }
+
                 case 240:
                     {
                         return "Call issuer for further information.";
                     }
+
                 case 250: // pickup card
                 case 251: // lost card
                 case 252: // stolen card
@@ -1117,66 +1173,82 @@ namespace Rock.NMI
                         // these are more sensitive declines so sanitize them a bit but provide a code for later lookup
                         return string.Format( "This card was declined (code: {0}).", result.GetValueOrNull( "result-code" ) );
                     }
+
                 case 260:
                     {
                         return string.Format( "Declined with further instructions available. ({0})", result.GetValueOrNull( "result-text" ) );
                     }
+
                 case 261:
                     {
                         return "Declined-Stop all recurring payments.";
                     }
+
                 case 262:
                     {
                         return "Declined-Stop this recurring program.";
                     }
+
                 case 263:
                     {
                         return "Declined-Update cardholder data available.";
                     }
+
                 case 264:
                     {
                         return "Declined-Retry in a few days.";
                     }
+
                 case 300:
                     {
                         return "Transaction was rejected by gateway.";
                     }
+
                 case 400:
                     {
                         return "Transaction error returned by processor.";
                     }
+
                 case 410:
                     {
                         return "Invalid merchant configuration.";
                     }
+
                 case 411:
                     {
                         return "Merchant account is inactive.";
                     }
+
                 case 420:
                     {
                         return "Communication error.";
                     }
+
                 case 421:
                     {
                         return "Communication error with issuer.";
                     }
+
                 case 430:
                     {
                         return "Duplicate transaction at processor.";
                     }
+
                 case 440:
                     {
                         return "Processor format error.";
                     }
+
                 case 441:
                     {
                         return "Invalid transaction information.";
                     }
+
                 case 460:
                     {
                         return "Processor feature not available.";
                     }
+
                 case 461:
                     {
                         return "Unsupported card type.";
@@ -1198,12 +1270,12 @@ namespace Rock.NMI
             StreamReader readStream = new StreamReader( receiveStream, encode );
 
             StringBuilder sb = new StringBuilder();
-            Char[] read = new Char[8192];
+            char[] read = new char[8192];
             int count = 0;
             do
             {
                 count = readStream.Read( read, 0, 8192 );
-                String str = new String( read, 0, count );
+                string str = new string( read, 0, count );
                 sb.Append( str );
             }
             while ( count > 0 );
@@ -1211,6 +1283,12 @@ namespace Rock.NMI
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Gets the x element value.
+        /// </summary>
+        /// <param name="parentElement">The parent element.</param>
+        /// <param name="elementName">Name of the element.</param>
+        /// <returns></returns>
         private string GetXElementValue( XElement parentElement, string elementName )
         {
             var x = parentElement.Element( elementName );
@@ -1218,9 +1296,15 @@ namespace Rock.NMI
             {
                 return x.Value;
             }
+
             return string.Empty;
         }
 
+        /// <summary>
+        /// Parses the date value.
+        /// </summary>
+        /// <param name="dateString">The date string.</param>
+        /// <returns></returns>
         private DateTime? ParseDateValue( string dateString )
         {
             if ( !string.IsNullOrWhiteSpace( dateString ) && dateString.Length >= 14 )
@@ -1236,9 +1320,8 @@ namespace Rock.NMI
             }
 
             return DateTime.MinValue;
-
         }
-        #endregion
 
+        #endregion
     }
 }
