@@ -107,7 +107,9 @@ namespace Rock.Web.Cache
 
         private static LavaTemplateCache Load( string content )
         {
-            var lavaTemplate = new LavaTemplateCache { Template = Template.Parse( content ) };
+            var template = Template.Parse( content );
+            template.MakeThreadSafe();
+            var lavaTemplate = new LavaTemplateCache { Template = template };
             return lavaTemplate;
         }
 
