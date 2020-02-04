@@ -22,6 +22,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Web.UI;
 using System.Xml.Linq;
 
 using RestSharp;
@@ -30,6 +31,7 @@ using Rock.Attribute;
 using Rock.Data;
 using Rock.Financial;
 using Rock.Model;
+using Rock.NMI.Controls;
 using Rock.Security;
 using Rock.Web.Cache;
 
@@ -80,20 +82,34 @@ namespace Rock.NMI
         DefaultValue = "https://secure.networkmerchants.com/api/query.php",
         Order = 4 )]
 
+    [TextField( "Direct Post API URL",
+        Key = AttributeKey.DirectPostAPIUrl,
+        Description = "The URL of the NMI Direct Post Query API",
+        IsRequired = true,
+        DefaultValue = "https://secure.nmi.com/api/transact.php",
+        Order = 5 )]
+
+    [TextField( "Tokenization Key",
+        Key = AttributeKey.TokenizationKey,
+        Description = "The Public Security Key to use for Tokenization. This is required for when using the NMI Hosted Gateway.",
+        IsRequired = false,
+        DefaultValue = "",
+        Order = 6 )]
+
     [BooleanField(
         "Prompt for Name On Card",
         Key = AttributeKey.PromptForName,
         Description = "Should users be prompted to enter name on the card",
         DefaultBooleanValue = false,
-        Order = 6 )]
+        Order = 7 )]
 
     [BooleanField(
         "Prompt for Billing Address",
         Key = AttributeKey.PromptForAddress,
         Description = "Should users be prompted to enter billing address",
         DefaultBooleanValue = false,
-        Order = 7 )]
-    public class Gateway : GatewayComponent, IThreeStepGatewayComponent
+        Order = 8 )]
+    public class Gateway : GatewayComponent, IThreeStepGatewayComponent, IHostedGatewayComponent
     {
         #region Attribute Keys
 
@@ -111,6 +127,7 @@ namespace Rock.NMI
 
             public const string QueryUrl = "QueryUrl";
             public const string DirectPostAPIUrl = "DirectPostAPIUrl";
+            public const string TokenizationKey = "TokenizationKey";
             public const string PromptForName = "PromptForName";
             public const string PromptForAddress = "PromptForAddress";
         }
@@ -1323,5 +1340,184 @@ namespace Rock.NMI
         }
 
         #endregion
+
+        #region DirectPost API related
+
+        /// <summary>
+        /// Posts to gateway using the Direct Post Api https://secure.tnbcigateway.com/merchants/resources/integration/integration_portal.php?#methodology
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <param name="data">The data.</param>
+        /// <returns></returns>
+        /// <exception cref="System.Exception"></exception>
+        private Dictionary<string, string> PostToGatewayDirectPostAPI( FinancialGateway financialGateway, Dictionary<string, string> queryParameters )
+        {
+            var directPostApiURL = GetAttributeValue( financialGateway, AttributeKey.DirectPostAPIUrl );
+            var restClient = new RestClient( directPostApiURL );
+
+            var restRequest = new RestRequest( Method.POST );
+            restRequest.RequestFormat = DataFormat.Xml;
+            foreach ( var queryParameter in queryParameters )
+            {
+                restRequest.AddQueryParameter( queryParameter.Key, queryParameter.Value );
+            }
+
+            restRequest.AddParameter( "username", GetAttributeValue( financialGateway, AttributeKey.AdminUsername ) );
+            restRequest.AddParameter( "password", GetAttributeValue( financialGateway, AttributeKey.AdminPassword ) );
+
+            try
+            {
+                var response = restClient.Execute( restRequest );
+
+                // deal with either an XML response or QueryString style response
+                var xdocResult = GetXmlResponse( response );
+                if ( xdocResult != null )
+                {
+                    // Convert XML result to a dictionary
+                    var result = new Dictionary<string, string>();
+                    foreach ( XElement element in xdocResult.Root.Elements() )
+                    {
+                        if ( element.HasElements )
+                        {
+                            string prefix = element.Name.LocalName;
+                            foreach ( XElement childElement in element.Elements() )
+                            {
+                                result.AddOrIgnore( prefix + "_" + childElement.Name.LocalName, childElement.Value.Trim() );
+                            }
+                        }
+                        else
+                        {
+                            result.AddOrIgnore( element.Name.LocalName, element.Value.Trim() );
+                        }
+                    }
+
+                    return result;
+                }
+                else
+                {
+                    // response in the form of response=3&responsetext=Plan Payments is required REFID:123456789&authcode=&transactionid=&avsresponse=&cvvresponse=&orderid=&type=&response_code=300&customer_vault_id=
+                    // so convert this to a dictionary
+                    var result = response?.Content?.Split( '&' ).ToList().Select( s => s.Split( '=' ) ).Where( a => a.Length == 2 ).ToDictionary( k => k[0], v => v[1] );
+
+                    return result;
+                }
+            }
+            catch ( WebException webException )
+            {
+                string message = GetResponseMessage( webException.Response.GetResponseStream() );
+                throw new Exception( webException.Message + " - " + message );
+            }
+            catch ( Exception ex )
+            {
+                throw ex;
+            }
+        }
+
+        #endregion DirectPost API related
+
+        #region IHostedGatewayComponent
+
+        public string ConfigureURL => "https://www.nmi.com/";
+
+        public string LearnMoreURL => "https://www.nmi.com/";
+
+        /// <summary>
+        /// Gets the hosted payment information control which will be used to collect CreditCard, ACH fields
+        /// Note: A HostedPaymentInfoControl can optionally implement <seealso cref="T:Rock.Financial.IHostedGatewayPaymentControlTokenEvent" />
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <param name="controlId">The control identifier.</param>
+        /// <param name="options">The options.</param>
+        /// <returns></returns>
+        public Control GetHostedPaymentInfoControl( FinancialGateway financialGateway, string controlId, HostedPaymentInfoControlOptions options )
+        {
+            NMIHostedPaymentControl nmiHostedPaymentControl = new NMIHostedPaymentControl { ID = controlId };
+            nmiHostedPaymentControl.NMIGateway = this;
+            List<NMIPaymentType> enabledPaymentTypes = new List<NMIPaymentType>();
+            if ( options?.EnableACH ?? true )
+            {
+                enabledPaymentTypes.Add( NMIPaymentType.ach );
+            }
+
+            if ( options?.EnableCreditCard ?? true )
+            {
+                enabledPaymentTypes.Add( NMIPaymentType.card );
+            }
+
+            nmiHostedPaymentControl.EnabledPaymentTypes = enabledPaymentTypes.ToArray();
+
+            nmiHostedPaymentControl.TokenizationKey = this.GetAttributeValue( financialGateway, AttributeKey.TokenizationKey );
+
+            return nmiHostedPaymentControl;
+        }
+
+        /// <summary>
+        /// Gets the JavaScript needed to tell the hostedPaymentInfoControl to get send the paymentInfo and get a token.
+        /// Have your 'Next' or 'Submit' call this so that the hostedPaymentInfoControl will fetch the token/response
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <param name="hostedPaymentInfoControl">The hosted payment information control.</param>
+        /// <returns></returns>
+        public string GetHostPaymentInfoSubmitScript( FinancialGateway financialGateway, Control hostedPaymentInfoControl )
+        {
+            return $"Rock.NMI.controls.gatewayCollectJS.submitPaymentInfo('{hostedPaymentInfoControl.ClientID}');";
+        }
+
+        public void UpdatePaymentInfoFromPaymentControl( FinancialGateway financialGateway, Control hostedPaymentInfoControl, ReferencePaymentInfo referencePaymentInfo, out string errorMessage )
+        {
+            errorMessage = null;
+
+            /*var tokenResponse = ( hostedPaymentInfoControl as NMIHostedPaymentControl ).PaymentInfoTokenRaw.FromJsonOrNull<TokenizerResponse>();
+            if ( tokenResponse?.IsSuccessStatus() != true )
+            {
+                if ( tokenResponse.HasValidationError() )
+                {
+                    errorMessage = tokenResponse.ValidationMessage;
+                }
+
+                errorMessage = tokenResponse?.Message ?? "null response from GetHostedPaymentInfoToken";
+                referencePaymentInfo.ReferenceNumber = ( hostedPaymentInfoControl as NMIHostedPaymentControl ).PaymentInfoToken;
+            }
+            else
+            {
+                referencePaymentInfo.ReferenceNumber = ( hostedPaymentInfoControl as NMIHostedPaymentControl ).PaymentInfoToken;
+            }
+            */
+        }
+
+        /// <summary>
+        /// Creates the customer account using a token received from the HostedPaymentInfoControl <seealso cref="M:Rock.Financial.IHostedGatewayComponent.GetHostedPaymentInfoControl(Rock.Model.FinancialGateway,System.String,Rock.Financial.HostedPaymentInfoControlOptions)" />
+        /// and returns a customer account token that can be used for future transactions.
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <param name="paymentInfo">The payment information.</param>
+        /// <param name="errorMessage">The error message.</param>
+        /// <returns></returns>
+        public string CreateCustomerAccount( FinancialGateway financialGateway, ReferencePaymentInfo paymentInfo, out string errorMessage )
+        {
+            errorMessage = string.Empty;
+
+            // see https://secure.tnbcigateway.com/merchants/resources/integration/integration_portal.php?#cv_variables
+            var queryParameters = new Dictionary<string, string>();
+            queryParameters.Add( "customer_vault", "add_customer" );
+            queryParameters.Add( "payment_token", paymentInfo.GatewayPersonIdentifier );
+
+            var response = PostToGatewayDirectPostAPI( financialGateway, queryParameters );
+
+            // TODO
+            return response.ToJson();
+        }
+
+        /// <summary>
+        /// Gets the earliest scheduled start date that the gateway will accept for the start date, based on the current local time.
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <returns></returns>
+        public DateTime GetEarliestScheduledStartDate( FinancialGateway financialGateway )
+        {
+            return RockDateTime.Today.AddDays( 1 ).Date;
+        }
+
+        #endregion IHostedGatewayComponent
     }
 }

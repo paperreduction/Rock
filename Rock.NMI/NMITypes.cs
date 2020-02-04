@@ -1,14 +1,37 @@
 ﻿using System;
 using System.Xml.Serialization;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using Rock.Financial;
 
 namespace Rock.NMI
 {
+
+    /// <summary>
+    /// 
+    /// </summary>
+    [JsonConverter( typeof( StringEnumConverter ) )]
+    public enum NMIPaymentType
+    {
+        /// <summary>
+        /// The card
+        /// </summary>
+        card,
+
+        /// <summary>
+        /// The ach
+        /// </summary>
+        ach
+    }
+
+/*
     /// <summary>
     /// 
     /// </summary>
     public class NMITypes
     {
+        
+
 
         /// <summary>
         /// 
@@ -484,5 +507,5 @@ namespace Rock.NMI
             [XmlElement( "billing" )]
             public BillingAddress Billing { get; set; }
         }
-    }
+    }*/
 }
