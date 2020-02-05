@@ -120,6 +120,8 @@
             },
 
             validateInputs: function () {
+
+                var self = this;
                 // according to https://secure.tnbcigateway.com/merchants/resources/integration/integration_portal.php?#cjs_integration_inline3, there will be things with 'CollectJSInvalid' classes if there are any validation errors
                 for (var iframeKey in CollectJS.iframes) {
                     var $frameEl = $(CollectJS.iframes[iframeKey]);
