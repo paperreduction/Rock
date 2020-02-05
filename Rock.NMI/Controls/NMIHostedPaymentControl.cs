@@ -22,6 +22,7 @@ using Rock.Web.UI;
 using Rock.NMI;
 using Rock.Web.UI.Controls;
 using System.Collections.Generic;
+using System.Web.UI.HtmlControls;
 
 namespace Rock.NMI.Controls
 {
@@ -39,12 +40,14 @@ namespace Rock.NMI.Controls
         private HiddenFieldWithClass _hfEnabledPaymentTypesJSON;
         private HiddenFieldWithClass _hfSelectedPaymentType;
 
-        private TextBox _tbCreditCardNumber;
-        private TextBox _tbCreditCardExp;
-        private TextBox _tbCreditCardCVV;
-        private TextBox _tbCheckAccountNumber;
-        private TextBox _tbCheckRoutingNumber;
-        private TextBox _tbCheckFullName;
+        private HtmlGenericControl _divCreditCardNumber;
+        private HtmlGenericControl _divCreditCardExp;
+        private HtmlGenericControl _divCreditCardCVV;
+        private HtmlGenericControl _divCheckAccountNumber;
+        private HtmlGenericControl _divCheckRoutingNumber;
+        private HtmlGenericControl _divCheckFullName;
+        private HtmlGenericControl _aPaymentButton;
+        private HtmlGenericControl _divValidationMessage;
 
 
         #endregion
@@ -195,7 +198,7 @@ namespace Rock.NMI.Controls
                     {
                         Rock.Financial.HostedGatewayPaymentControlTokenEventArgs hostedGatewayPaymentControlTokenEventArgs = new Financial.HostedGatewayPaymentControlTokenEventArgs();
 
-                        /*var tokenResponse = PaymentInfoTokenRaw.FromJsonOrNull<TokenizerResponse>();
+                        var tokenResponse = PaymentInfoTokenRaw.FromJsonOrNull<TokenizerResponse>();
 
                         if ( tokenResponse?.IsSuccessStatus() != true )
                         {
@@ -214,7 +217,7 @@ namespace Rock.NMI.Controls
                         {
                             hostedGatewayPaymentControlTokenEventArgs.IsValid = true;
                             hostedGatewayPaymentControlTokenEventArgs.ErrorMessage = null;
-                        }*/
+                        }
 
                         hostedGatewayPaymentControlTokenEventArgs.Token = _hfPaymentInfoToken.Value;
 
@@ -242,21 +245,52 @@ namespace Rock.NMI.Controls
             _hfSelectedPaymentType = new HiddenFieldWithClass() { ID = "_hfSelectedPaymentType", CssClass = "js-selected-payment-type" };
             Controls.Add( _hfSelectedPaymentType );
 
-            var pnlPaymentInputs = new Panel { ID = "pnlPaymentInputs", CssClass= "js-nmi-payment-inputs nmi-payment-inputs" };
-            _tbCreditCardNumber = new TextBox { CssClass = "js-credit-card-input credit-card-input" };
-            pnlPaymentInputs.Controls.Add( _tbCreditCardNumber );
-            _tbCreditCardExp = new TextBox { CssClass = "js-credit-card-exp-input credit-card-exp-input" };
-            pnlPaymentInputs.Controls.Add( _tbCreditCardExp );
-            _tbCreditCardCVV = new TextBox { CssClass = "js-credit-card-cvv-input credit-card-cvv-input" };
-            pnlPaymentInputs.Controls.Add( _tbCreditCardCVV );
-            _tbCheckAccountNumber = new TextBox { CssClass = "js-check-account-number-input check-account-number-input" };
-            pnlPaymentInputs.Controls.Add( _tbCheckAccountNumber );
-            _tbCheckRoutingNumber = new TextBox { CssClass = "js-check-routing-number-input check-routing-number-input" };
-            pnlPaymentInputs.Controls.Add( _tbCheckRoutingNumber );
-            _tbCheckFullName = new TextBox { CssClass = "js-check-fullname-input check-fullname-input" };
-            pnlPaymentInputs.Controls.Add( _tbCheckFullName );
+            var pnlPaymentInputs = new Panel { ID = "pnlPaymentInputs", CssClass = "js-nmi-payment-inputs nmi-payment-inputs" };
+
+            
+            _divCreditCardNumber = new HtmlGenericControl( "div" );
+            _divCreditCardNumber.AddCssClass( "js-credit-card-input credit-card-input" );
+            pnlPaymentInputs.Controls.Add( _divCreditCardNumber );
+
+            _divCreditCardExp = new HtmlGenericControl( "div" );
+            _divCreditCardExp.AddCssClass( "js-credit-card-exp-input credit-card-exp-input" );
+            pnlPaymentInputs.Controls.Add( _divCreditCardExp );
+
+            _divCreditCardCVV = new HtmlGenericControl( "div" );
+            _divCreditCardCVV.AddCssClass( "js-credit-card-cvv-input credit-card-cvv-input" );
+            pnlPaymentInputs.Controls.Add( _divCreditCardCVV );
+
+            _divCheckAccountNumber = new HtmlGenericControl( "div" );
+            _divCheckAccountNumber.AddCssClass( "js-check-account-number-input check-account-number-input" );
+            //pnlPaymentInputs.Controls.Add( _divCheckAccountNumber );
+
+            _divCheckRoutingNumber = new HtmlGenericControl( "div" );
+            _divCheckRoutingNumber.AddCssClass( "js-check-routing-number-input check-routing-number-input" );
+            //pnlPaymentInputs.Controls.Add( _divCheckRoutingNumber );
+
+            _divCheckFullName = new HtmlGenericControl( "div" );
+            _divCheckFullName.AddCssClass( "js-check-fullname-input check-fullname-input" );
+            //pnlPaymentInputs.Controls.Add( _divCheckFullName );
+
+            // collectJs needs a payment button to work, so add it but don't show it
+            _aPaymentButton = new HtmlGenericControl( "button" );
+            _aPaymentButton.Attributes["type"] = "button";
+            _aPaymentButton.Style[HtmlTextWriterStyle.Display] = "none";
+            _aPaymentButton.AddCssClass( "js-payment-button payment-button" );
+            pnlPaymentInputs.Controls.Add( _aPaymentButton );
+
+            _divValidationMessage = new HtmlGenericControl( "div" );
+            _divValidationMessage.AddCssClass( "alert alert-validation js-payment-input-validation" );
+            _divValidationMessage.InnerHtml =
+@"Please correct the following:
+<ul>
+<li><span class='js-validation-message'></span></li>
+</ul>";
+            pnlPaymentInputs.Controls.Add( _divValidationMessage );
 
             Controls.Add( pnlPaymentInputs );
         }
+
+       
     }
 }

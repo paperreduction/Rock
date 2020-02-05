@@ -22,10 +22,25 @@
                 self.$checkAccountNumberInput = $('.js-check-account-number-input', $control);
                 self.$checkRoutingNumberInput = $('.js-check-routing-number-input', $control);
                 self.$checkFullNameInput = $('.js-check-fullname-input', $control);
+                self.$paymentButton = $('.js-payment-button', $control);
+                self.$paymentValidation = $('.js-payment-input-validation', $control);
+                self.$paymentValidation.hide();
+                self.validationFieldStatus = {
+                    ccnumber: {},
+                    ccexp: {},
+                    cvv: {
+                        status:true
+                    }
+                }
 
-                debugger
+                var postbackScript = $control.attr('data-postback-script');
+
+                self.$paymentButton.click(function (a) {
+                    console.log("Payment button click");
+                })
 
                 self.collectJSSettings = {
+                    paymentSelector: '#' + controlId + ' .js-payment-button',
                     fields: {
                         ccnumber: {
                             selector: '#' + controlId + ' .js-credit-card-input',
@@ -60,14 +75,26 @@
                         }
                     },
                     variant: "inline",
+                    timeoutDuration: 2000,
+                    timeoutCallback: function () {
+                        console.log("The tokenization didn't respond in the expected timeframe.  This could be due to an invalid or incomplete field or poor connectivity");
+                        self.validateInputs();
+                    },
+                    invalidCss: {
+                        "background-color": "red",
+                        "color": "white"
+                    },
                     validationCallback: function (field, status, message) {
-                        debugger
-                        console.log(field);
-                        console.log(status);
-                        console.log(message);
+                        // if there is a validation error, keep the message and field that has the error. Then we'll check it before doing the submitPaymentInfo
+                        console.log(field + ':' + status + ':' + message);
+
+                        self.validationFieldStatus[field] = {
+                            status: status,
+                            message: message
+                        };
                     },
                     fieldsAvailableCallback: function (a, b, c) {
-                        debugger
+                        console.log("fieldsAvailableCallback");
                     },
                     callback: function (resp) {
                         debugger
@@ -83,12 +110,63 @@
                 CollectJS.configure(self.collectJSSettings);
             },
 
-            // Tells the gatewayTokenizer to submit the entered info so that we can get a token (or error, etc) in the response
-            submitPaymentInfo: function (controlId) {
-                debugger
-                var $control = $('#' + controlId)
 
-                CollectJS.startPaymentRequest() // Use submission callback to deal with response
+            submitPaymentInfo: function (controlId) {
+                var self = this
+                console.log('submitPaymentInfo');
+                setTimeout(function () {
+                    self.startSubmitPaymentInfo(self, controlId);
+                }, 0);
+            },
+
+            validateInputs: function () {
+                // according to https://secure.tnbcigateway.com/merchants/resources/integration/integration_portal.php?#cjs_integration_inline3, there will be things with 'CollectJSInvalid' classes if there are any validation errors
+                for (var iframeKey in CollectJS.iframes) {
+                    var $frameEl = $(CollectJS.iframes[iframeKey]);
+                    if ($frameEl.hasClass('CollectJSInvalid') == true) {
+                        // if a field has CollectJSInValid, is should be indicated with a red outline, or something similar
+                        //return;
+                    }
+                }
+
+                var validationMessage = '';
+
+                var hasInvalidFields = $('.CollectJSInvalid').length > 0;
+
+                var validationFieldTitle = ''
+                for (var validationFieldKey in self.validationFieldStatus) {
+                    var validationField = self.validationFieldStatus[validationFieldKey];
+                    if (!validationField.status) {
+                        hasInvalidFields = true;
+                        validationFieldTitle = CollectJS.config.fields[validationFieldKey].title;
+                        validationMessage = validationField.message || validationFieldTitle + ' cannot be blank';
+                        break;
+                    }
+                }
+
+
+                if (hasInvalidFields) {
+                    var $validationMessage = self.$paymentValidation.find('.js-validation-message')
+                    $validationMessage.text(validationMessage);
+                    self.$paymentValidation.show();
+                }
+                else {
+                    self.$paymentValidation.hide();
+                }
+            },
+
+            // Tells the gatewayTokenizer to submit the entered info so that we can get a token (or error, etc) in the response
+            // ToDo, we might want to do wait to make sure validation events are fired
+            startSubmitPaymentInfo: function (self, controlId) {
+
+                console.log('startSubmitPaymentInfo');
+                debugger
+
+                CollectJS.startPaymentRequest();
+                return;
+
+
+                
             }
         }
 

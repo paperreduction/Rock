@@ -133,6 +133,7 @@ namespace RockWeb.Blocks.Finance
     [TextField(
         "Anonymous Giving Tool-tip",
         Key = AttributeKey.AnonymousGivingTooltip,
+        IsRequired = false,
         Description = "The tool-tip for the 'Give Anonymously' check box.",
         Category = AttributeCategory.None,
         Order = 25 )]
