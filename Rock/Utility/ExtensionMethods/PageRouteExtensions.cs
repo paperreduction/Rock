@@ -108,9 +108,23 @@ namespace Rock
                 }
             }
 
-            if ( filteredRoutes.Where( r => string.Compare( r.Url, routeName, true ) == 0 ).Any() )
+            /*
+                2020-02-12 ETD
+                We need to check for an existing route but a simple string compare is not good enough, as variable names should be
+                able to vary. e.g. one site has entity/{id} and another has entity/{guid} these should both be in the same route
+                with different datatokens. Otherwise the first match is used and no domain matching logic can take place.
+
+                This is one route with two "PageRoute" DataTokens so there is only one URL. If RouteTable.Routes is inspected only
+                one of the variable names is displayed. In the example above both pages are grouped under the route URL entity/{id}.
+                However to the user in the UI it is still displayed as two seperate routes since it is two different PageRoute objects.
+             */
+
+            var reg = new System.Text.RegularExpressions.Regex( @"\{.*?\}" );
+            var routeNameReg = reg.Replace( routeName, "{}" );
+
+            if ( filteredRoutes.Where( r => string.Compare( reg.Replace( r.Url, "{}" ), routeNameReg, true ) == 0 ).Any() )
             {
-                route = filteredRoutes.Where( r => string.Compare( r.Url, routeName, true ) == 0 ).First();
+                route = filteredRoutes.Where( r => string.Compare( reg.Replace( r.Url, "{}" ), routeNameReg, true ) == 0 ).First();
 
                 var pageRoutes = ( List<Rock.Web.PageAndRouteId> ) route.DataTokens["PageRoutes"];
                 if ( pageRoutes == null )
