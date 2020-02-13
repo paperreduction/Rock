@@ -30,7 +30,7 @@ namespace Rock.Field.Types
     ///  Matrix Field Type
     ///  Value stored as AttributeMatrix.Guid
     /// </summary>
-    public class MatrixFieldType : FieldType, IEntityFieldType
+    public class MatrixFieldType : FieldType, IEntityFieldType, IEntityFieldTypeEntityCopy
     {
         #region Configuration
 
@@ -282,7 +282,7 @@ namespace Rock.Field.Types
                     }
 
                     // If the AttributeMatrixTemplateId jwas changed since the last time the attributeMatrix was saved, change it and wipe out the items
-                    if ( attributeMatrix.AttributeMatrixTemplateId != attributeMatrixEditor.AttributeMatrixTemplateId.Value)
+                    if ( attributeMatrix.AttributeMatrixTemplateId != attributeMatrixEditor.AttributeMatrixTemplateId.Value )
                     {
                         attributeMatrix.AttributeMatrixTemplateId = attributeMatrixEditor.AttributeMatrixTemplateId.Value;
 
@@ -290,7 +290,7 @@ namespace Rock.Field.Types
 
                         // If the AttributeMatrixTemplateId changed, all the values in the AttributeMatrixItems 
                         // are referring to attributes from the old template, so wipe them out. All of them.
-                        foreach( var attributeMatrixItem in attributeMatrix.AttributeMatrixItems.ToList())
+                        foreach ( var attributeMatrixItem in attributeMatrix.AttributeMatrixItems.ToList() )
                         {
                             attributeMatrixItemService.Delete( attributeMatrixItem );
                         }
@@ -388,5 +388,55 @@ namespace Rock.Field.Types
         }
 
         #endregion
+
+        public string CopyAttribute( string originalValue, EntityCopyAction copyAction, RockContext rockContext )
+        {
+            switch ( copyAction )
+            {
+                case EntityCopyAction.UseOriginal:
+                    return originalValue;
+                case EntityCopyAction.DuplicateOriginal:
+                    Guid? guid = originalValue.AsGuidOrNull();
+                    if ( guid != null )
+                    {
+                        var service = new AttributeMatrixService( rockContext );
+                        var item = service.Get( guid.Value );
+                        foreach(var matrixItem in item.AttributeMatrixItems )
+                        {
+                            matrixItem.LoadAttributes();
+                        }
+
+                        var newItem = item.Clone( true );
+
+                        newItem.Guid = Guid.NewGuid();
+                        newItem.CreatedDateTime = RockDateTime.Now;
+                        newItem.ModifiedDateTime = RockDateTime.Now;
+
+                        newItem.AttributeMatrixTemplate.Guid = Guid.NewGuid();
+                        newItem.AttributeMatrixTemplate.CreatedDateTime = RockDateTime.Now;
+                        newItem.AttributeMatrixTemplate.ModifiedDateTime = RockDateTime.Now;
+
+                        foreach(var matrixItem in newItem.AttributeMatrixItems )
+                        {
+                            matrixItem.Guid = Guid.NewGuid();
+                            matrixItem.CreatedDateTime = RockDateTime.Now;
+                            matrixItem.ModifiedDateTime = RockDateTime.Now;
+                        }
+
+                        foreach ( var key in matrixItem.Attributes.Keys )
+                        {
+                            var mav = matrixItem.GetAttributeValue( key );
+                            matrixItem.SetAttributeValue( key, mav );
+                        }
+
+                        service.Add( newItem );
+
+                        return newItem.Guid.ToString();
+                    }
+                    return string.Empty;
+                default:
+                    return string.Empty;
+            }
+        }
     }
 }

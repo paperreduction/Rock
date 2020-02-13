@@ -28,6 +28,7 @@ using Rock;
 using Rock.Attribute;
 using Rock.Constants;
 using Rock.Data;
+using Rock.Field.Types;
 using Rock.Model;
 using Rock.Security;
 using Rock.Web;
@@ -1112,7 +1113,12 @@ namespace RockWeb.Blocks.Groups
                     {
                         foreach ( var attributeKey in group.Attributes.Select( a => a.Key ) )
                         {
+                            var fieldTypeEntityCopy = group.Attributes[attributeKey].FieldType.Field as IEntityFieldTypeEntityCopy;
                             string value = group.GetAttributeValue( attributeKey );
+                            if (fieldTypeEntityCopy != null )
+                            {
+                                value = fieldTypeEntityCopy.CopyAttribute( value, EntityCopyAction.DuplicateOriginal, rockContext );                                
+                            }
                             newGroup.SetAttributeValue( attributeKey, value );
                         }
                     }
@@ -1125,7 +1131,9 @@ namespace RockWeb.Blocks.Groups
                     string qualifierValue = group.Id.ToString();
 
                     // Get the existing attributes for this entity type and qualifier value
-                    var attributes = attributeService.GetByEntityTypeQualifier( entityTypeId, qualifierColumn, qualifierValue, true );
+                    var attributes = attributeService
+                        .GetByEntityTypeQualifier( entityTypeId, qualifierColumn, qualifierValue, true );
+                        //.Where(a => !(a is IHasEntityReferenceValues));
 
                     foreach ( var attribute in attributes )
                     {

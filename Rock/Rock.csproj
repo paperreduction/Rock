@@ -284,6 +284,7 @@
     <Compile Include="Attribute\BackgroundCheckFieldAttribute.cs" />
     <Compile Include="Attribute\GenderFieldAttribute.cs" />
     <Compile Include="Attribute\IHasAttributes.cs" />
+    <Compile Include="Field\Types\IEntityFieldTypeEntityCopy.cs" />
     <Compile Include="Attribute\InteractionChannelFieldAttribute.cs" />
     <Compile Include="Attribute\InteractionChannelsFieldAttribute.cs" />
     <Compile Include="Attribute\LabelFieldAttribute.cs" />
