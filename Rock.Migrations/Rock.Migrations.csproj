@@ -253,6 +253,10 @@
     <Compile Include="Migrations\202002141444362_CreateDefaultSmsPipeline.Designer.cs">
       <DependentUpon>202002141444362_CreateDefaultSmsPipeline.cs</DependentUpon>
     </Compile>
+    <Compile Include="Migrations\202002141748209_UpdateGivingAnalyticsStoredProcs.cs" />
+    <Compile Include="Migrations\202002141748209_UpdateGivingAnalyticsStoredProcs.Designer.cs">
+      <DependentUpon>202002141748209_UpdateGivingAnalyticsStoredProcs.cs</DependentUpon>
+    </Compile>
     <Compile Include="Migrations\Version 9.0\Version 1.9.0\201907082136571_Rollup0708.cs" />
     <Compile Include="Migrations\Version 9.0\Version 1.9.0\201907082136571_Rollup0708.Designer.cs">
       <DependentUpon>201907082136571_Rollup0708.cs</DependentUpon>
@@ -1002,6 +1006,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Migrations\202002141444362_CreateDefaultSmsPipeline.resx">
       <DependentUpon>202002141444362_CreateDefaultSmsPipeline.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\202002141748209_UpdateGivingAnalyticsStoredProcs.resx">
+      <DependentUpon>202002141748209_UpdateGivingAnalyticsStoredProcs.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Migrations\Version 9.0\Version 1.9.0\201907082136571_Rollup0708.resx">
       <DependentUpon>201907082136571_Rollup0708.cs</DependentUpon>
