@@ -35,20 +35,62 @@ namespace Rock.Jobs
     /// <summary>
     /// Job to process communications
     /// </summary>
-    [GroupTypeField( "Group Type", "The Group type to send attendance reminders for.", true, Rock.SystemGuid.GroupType.GROUPTYPE_SMALL_GROUP, "", 0 )]
-    [SystemCommunicationField( "System Email", "The system email to use when sending reminder.", true, Rock.SystemGuid.SystemCommunication.GROUP_ATTENDANCE_REMINDER, "", 1 )]
-    [TextField( "Send Reminders", "Comma delimited list of days after a group meets to send an additional reminder. For example, a value of '2,4' would result in an additional reminder getting sent two and four days after group meets if attendance was not entered.", false, "", "", 2 )]
+    [GroupTypeField( "Group Type", "The Group type to send attendance reminders for.", true, Rock.SystemGuid.GroupType.GROUPTYPE_SMALL_GROUP, "", 0, AttributeKey.GroupType )]
+
+    #region Job Attributes
+    [SystemCommunicationField( "System Communication",
+        "The system communication to use when sending reminder.",
+        true,
+        Rock.SystemGuid.SystemCommunication.GROUP_ATTENDANCE_REMINDER,
+        "",
+        1,
+        AttributeKey.SystemEmail )] // NOTE: This key is different than the label!
+
+    [TextField( "Send Reminders", "Comma delimited list of days after a group meets to send an additional reminder. For example, a value of '2,4' would result in an additional reminder getting sent two and four days after group meets if attendance was not entered.", false, "", "", 2, AttributeKey.SendReminders )]
+
     [CustomDropdownListField(
         "Send Using",
         "Specifies how the reminder will be sent.",
-        "Email,SMS,Recipient Preference",
-        Key = "SendUsingConfiguration",
+        "1^Email,2^SMS,0^Recipient Preference",
+        Key = AttributeKey.SendUsingConfiguration,
         IsRequired = true,
-        DefaultValue = "Recipient Preference",
+        DefaultValue = "0",
         Order = 3 )]
+    #endregion
+
     [DisallowConcurrentExecution]
     public class SendAttendanceReminder : IJob
     {
+        #region Attribute Keys
+
+        /// <summary>
+        /// Keys to use for Block Attributes
+        /// </summary>
+        private static class AttributeKey
+        {
+            /// <summary>
+            /// The group type setting.
+            /// </summary>
+            public const string GroupType = "GroupType";
+
+            /// <summary>
+            /// The system communication attribute setting-key.
+            /// </summary>
+            public const string SystemEmail = "SystemEmail";
+
+            /// <summary>
+            /// The send reminders 'days before' comma delimited setting
+            /// </summary>
+            public const string SendReminders = "SendReminders";
+
+            /// <summary>
+            /// The method to use when determining how the notice should be sent.
+            /// </summary>
+            public const string SendUsingConfiguration = "SendUsingConfiguration";
+        }
+
+        #endregion Attribute Keys
+
         /// <summary>
         /// Initializes a new instance of the <see cref="SendCommunications"/> class.
         /// </summary>
@@ -63,8 +105,9 @@ namespace Rock.Jobs
         public virtual void Execute( IJobExecutionContext context )
         {
             JobDataMap dataMap = context.JobDetail.JobDataMap;
-            var groupType = GroupTypeCache.Get( dataMap.GetString( "GroupType" ).AsGuid() );
-            var sendUsingConfiguration = dataMap.GetString( "SendUsingConfiguration" );
+            var groupType = GroupTypeCache.Get( dataMap.GetString( AttributeKey.GroupType ).AsGuid() );
+            var sendUsingConfiguration = ( CommunicationType ) dataMap.GetString( AttributeKey.SendUsingConfiguration ).AsInteger();
+
 
             int attendanceRemindersSent = 0;
             int errorCount = 0;
@@ -78,7 +121,7 @@ namespace Rock.Jobs
                 dates.Add( RockDateTime.Today );
                 try
                 {
-                    string[] reminderDays = dataMap.GetString( "SendReminders" ).Split( ',' );
+                    string[] reminderDays = dataMap.GetString( AttributeKey.SendReminders ).Split( ',' );
                     foreach ( string reminderDay in reminderDays )
                     {
                         if ( reminderDay.Trim().IsNotNullOrWhiteSpace() )
@@ -207,14 +250,14 @@ namespace Rock.Jobs
                         m.Person.Email != string.Empty )
                     .ToList();
 
-                var systemEmailGuid = dataMap.GetString( "SystemEmail" ).AsGuid();
+                var systemEmailGuid = dataMap.GetString( AttributeKey.SystemEmail ).AsGuid();
                 var systemCommunication = new SystemCommunicationService( rockContext ).Get( systemEmailGuid );
 
                 var isSmsEnabled = MediumContainer.HasActiveSmsTransport();
-                var alwaysSendEmail = !isSmsEnabled || sendUsingConfiguration.Equals( "Email" ) || string.IsNullOrWhiteSpace( systemCommunication.SMSMessage );
-                var alwaysSendSms = isSmsEnabled && sendUsingConfiguration.Equals( "SMS" );
+                var alwaysSendEmail = !isSmsEnabled || sendUsingConfiguration == CommunicationType.Email || string.IsNullOrWhiteSpace( systemCommunication.SMSMessage );
+                var alwaysSendSms = sendUsingConfiguration == CommunicationType.SMS;
 
-                if ( !sendUsingConfiguration.Equals( "Email" ) && string.IsNullOrWhiteSpace( systemCommunication.SMSMessage ) )
+                if ( sendUsingConfiguration != CommunicationType.Email && string.IsNullOrWhiteSpace( systemCommunication.SMSMessage ) )
                 {
                     errorMessages.Add( string.Format( "No SMS message found in system communication {0}.", systemCommunication.Title ) );
                     errorCount++;
@@ -240,18 +283,19 @@ namespace Rock.Jobs
                         RockMessage message = null;
                         var recipients = new List<RockMessageRecipient>();
 
-                        var phoneNumber = leader.Person.PhoneNumbers.Where( p => p.IsMessagingEnabled ).FirstOrDefault();
-                        var smsNumber = phoneNumber == null ? string.Empty : phoneNumber.ToSmsNumber();
-
-                        if ( sendSms && string.IsNullOrWhiteSpace( smsNumber ) )
-                        {
-                            sendSms = false;
-                            errorMessages.Add( string.Format( "No SMS number could be found for {0}.", leader.Person ) );
-                            errorCount++;
-                        }
-
                         if ( sendSms )
                         {
+                            var phoneNumber = leader.Person.PhoneNumbers.Where( p => p.IsMessagingEnabled ).FirstOrDefault();
+                            var smsNumber = phoneNumber == null ? string.Empty : phoneNumber.ToSmsNumber();
+
+                            if ( string.IsNullOrWhiteSpace( smsNumber ) || !isSmsEnabled )
+                            {
+                                string smsErrorMessage = GenerateSmsErrorMessage( isSmsEnabled, alwaysSendSms, leader.Person, groupMemberSendSms, personSendSms );
+                                errorMessages.Add( smsErrorMessage );
+                                errorCount++;
+                                continue;
+                            }
+
                             recipients.Add( new RockSMSMessageRecipient( leader.Person, smsNumber, mergeObjects ) );
 
                             message = new RockSMSMessage( systemCommunication );
@@ -296,6 +340,30 @@ namespace Rock.Jobs
                 ExceptionLogService.LogException( exception, context2 );
                 throw exception;
             }
+        }
+
+        private string GenerateSmsErrorMessage( bool isSmsEnabled, bool alwaysSendSms, Person person, bool groupMemberSendSms, bool personSendSms )
+        {
+            var smsErrorMessage = "{0} calls for SMS, but no SMS number could be found for {1}.";
+            if ( !isSmsEnabled )
+            {
+                smsErrorMessage = "{0} calls for SMS, but SMS is not enabled. {1} did not receive a notification.";
+            }
+
+            if ( alwaysSendSms )
+            {
+                smsErrorMessage = string.Format( smsErrorMessage, "Job Settings", person );
+            }
+            else if ( groupMemberSendSms )
+            {
+                smsErrorMessage = string.Format( smsErrorMessage, "Group Member Communications Settings", person );
+            }
+            else if ( personSendSms )
+            {
+                smsErrorMessage = string.Format( smsErrorMessage, "The Person's Communications Settings", person );
+            }
+
+            return smsErrorMessage;
         }
     }
 }
