@@ -33,7 +33,7 @@ namespace Rock.Web.UI.Controls.Communication
     {
         #region UI Controls
 
-        private DefinedValuePicker dvpFrom;
+        private RockDropDownList dvpFrom;
         private RockControlWrapper rcwMessage;
         private MergeFieldPicker mfpMessage;
         private Label lblCount;
@@ -123,17 +123,13 @@ namespace Rock.Web.UI.Controls.Communication
             var selectedNumberGuids = SelectedNumbers; //GetAttributeValue( "FilterCategories" ).SplitDelimitedValues( true ).AsGuidList();
             var definedType = DefinedTypeCache.Get( new Guid( Rock.SystemGuid.DefinedType.COMMUNICATION_SMS_FROM ) );
 
-
-            dvpFrom = new DefinedValuePicker();
-            dvpFrom.ID = string.Format( "dvpFrom_{0}", this.ID );
-            dvpFrom.Label = "From";
-            dvpFrom.Help = "The number to originate message from (configured under Admin Tools > Communications > SMS Phone Numbers).";
             if ( selectedNumberGuids.Any() )
             {
+                dvpFrom = new RockDropDownList();
                 dvpFrom.SelectedIndex = -1;
                 dvpFrom.DataSource = definedType.DefinedValues.Where( v => selectedNumberGuids.Contains( v.Guid ) ).Select( v => new
                 {
-                    v.Description,
+                    Description = string.IsNullOrWhiteSpace(v.Description) ? v.Value : v.Description,
                     v.Id
                 } );
                 dvpFrom.DataTextField = "Description";
@@ -142,9 +138,15 @@ namespace Rock.Web.UI.Controls.Communication
             }
             else
             {
-                dvpFrom.DefinedTypeId = definedType.Id;
+                var definedValuePicker = new DefinedValuePicker();
+                definedValuePicker.DefinedTypeId = definedType.Id;
+                definedValuePicker.DisplayDescriptions = true;
+                dvpFrom = definedValuePicker;
             }
-            dvpFrom.DisplayDescriptions = true;
+
+            dvpFrom.ID = string.Format( "dvpFrom_{0}", this.ID );
+            dvpFrom.Label = "From";
+            dvpFrom.Help = "The number to originate message from (configured under Admin Tools > Communications > SMS Phone Numbers).";
             dvpFrom.Required = true;
             Controls.Add( dvpFrom );
 
