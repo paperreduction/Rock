@@ -401,29 +401,25 @@ namespace Rock.Field.Types
                     {
                         var service = new AttributeMatrixService( rockContext );
                         var itemService = new AttributeMatrixItemService( rockContext );
-                        var item = service.Get( guid.Value );
-                        foreach ( var matrixItem in item.AttributeMatrixItems )
-                        {
-                            matrixItem.LoadAttributes();
-                        }
 
-                        var newItem = item.Clone( true );
+                        var item = service.Get( guid.Value );
+                        var newItem = item.Clone( false );
 
                         newItem.Guid = Guid.NewGuid();
                         newItem.CreatedDateTime = RockDateTime.Now;
                         newItem.ModifiedDateTime = RockDateTime.Now;
 
-                        newItem.AttributeMatrixTemplate.Guid = Guid.NewGuid();
-                        newItem.AttributeMatrixTemplate.CreatedDateTime = RockDateTime.Now;
-                        newItem.AttributeMatrixTemplate.ModifiedDateTime = RockDateTime.Now;
+                        newItem.AttributeMatrixTemplateId = item.AttributeMatrixTemplateId;
+                        newItem.AttributeMatrixItems = new List<AttributeMatrixItem>();
 
-                        foreach ( var matrixItem in newItem.AttributeMatrixItems )
+                        foreach ( var matrixItem in item.AttributeMatrixItems )
                         {
-                            matrixItem.Guid = Guid.NewGuid();
-                            matrixItem.CreatedDateTime = RockDateTime.Now;
-                            matrixItem.ModifiedDateTime = RockDateTime.Now;
+                            var newMatrixItem = matrixItem.Clone( false );
+                            newMatrixItem.Guid = Guid.NewGuid();
+                            newMatrixItem.CreatedDateTime = RockDateTime.Now;
+                            newMatrixItem.ModifiedDateTime = RockDateTime.Now;
 
-                            itemService.Add( matrixItem );
+                            newItem.AttributeMatrixItems.Add( newMatrixItem );
                         }
                         service.Add( newItem );
 
@@ -432,13 +428,15 @@ namespace Rock.Field.Types
                         for ( var i = 0; i < newItem.AttributeMatrixItems.Count; i++ )
                         {
                             var originalMatrixItem = item.AttributeMatrixItems.ToList()[i];
-                            var newMatrixItem = newItem.AttributeMatrixItems.ToList()[i];
+                            originalMatrixItem.LoadAttributes();
 
-                            foreach ( var key in newMatrixItem.Attributes.Keys )
+                            var newMatrixItem = newItem.AttributeMatrixItems.ToList()[i];
+                            newMatrixItem.LoadAttributes();
+
+                            foreach ( var key in originalMatrixItem.Attributes.Keys )
                             {
                                 var mav = originalMatrixItem.GetAttributeValue( key );
                                 newMatrixItem.SetAttributeValue( key, mav );
-                                
                             }
 
                             newMatrixItem.SaveAttributeValues( rockContext );
