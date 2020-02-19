@@ -302,6 +302,21 @@ namespace Rock.MyWell
         public string ConfigureURL => "https://www.mywell.org/get-started/";
 
         /// <summary>
+        /// Gets the hosted gateway modes that this gateway has configured/supports. Use this to determine which mode to use (in cases where both are supported, like Scheduled Payments lists ).
+        /// If the Gateway supports both hosted and unhosted (and has Hosted mode configured), hosted mode should be preferred.
+        /// </summary>
+        /// <param name="financialGateway"></param>
+        /// <returns></returns>
+        /// <value>
+        /// The hosted gateway modes that this gateway supports
+        /// </value>
+        public HostedGatewayMode[] GetSupportedHostedGatewayModes( FinancialGateway financialGateway )
+        {
+            // MyWellGateway only supports Hosted mode
+            return new HostedGatewayMode[1] { HostedGatewayMode.Hosted }; 
+        }
+
+        /// <summary>
         /// Creates the customer account using a token received from the HostedPaymentInfoControl <seealso cref="M:Rock.Financial.IHostedGatewayComponent.GetHostedPaymentInfoControl(Rock.Model.FinancialGateway,System.Boolean,System.String)" />
         /// and returns a customer account token that can be used for future transactions.
         /// </summary>

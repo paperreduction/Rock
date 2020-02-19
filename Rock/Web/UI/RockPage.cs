@@ -2993,17 +2993,39 @@ Sys.Application.add_load(function () {
         /// <param name="src">The source.</param>
         public static void AddScriptSrcToHead( Page page, string scriptId, string src )
         {
+            AddScriptSrcToHead( page, scriptId, src, null );
+        }
+
+        /// <summary>
+        /// Adds a script tag with the specified id, source, and attributes to head (if it doesn't already exist)
+        /// </summary>
+        /// <param name="page">The page.</param>
+        /// <param name="scriptId">The script identifier.</param>
+        /// <param name="src">The source.</param>
+        /// <param name="additionalAttributes">The additional attributes.</param>
+        public static void AddScriptSrcToHead( Page page, string scriptId, string src, Dictionary<string, string> additionalAttributes )
+        {
             if ( page != null && page.Header != null )
             {
                 var header = page.Header;
 
                 if ( !header.Controls.OfType<Literal>().Any( a => a.ID == scriptId ) )
                 {
-                    Literal l = new Literal {
-                        ID = scriptId,
-                        Text = $"<script id='{scriptId}' src='{src}'></script>"
+                    Literal l = new Literal
+                    {
+                        ID = scriptId
                     };
 
+                    StringBuilder sbScriptTagHTML = new StringBuilder();
+                    sbScriptTagHTML.Append( $"<script id='{scriptId}' src='{src}'" );
+                    string additionalAttributesHtml = additionalAttributes?.Select( a => $"{a.Key}='{a.Value}'" ).ToList().AsDelimited( " " );
+                    if ( additionalAttributesHtml.IsNotNullOrWhiteSpace() )
+                    {
+                        sbScriptTagHTML.Append( $" {additionalAttributesHtml}" );
+                    }
+
+                    sbScriptTagHTML.Append( "></script>" );
+                    l.Text = sbScriptTagHTML.ToString();
                     header.Controls.Add( l );
                 }
             }

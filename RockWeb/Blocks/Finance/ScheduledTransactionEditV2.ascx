@@ -39,7 +39,9 @@
             <Rock:NotificationBox ID="nbUpdateScheduledPaymentWarning" runat="server" NotificationBoxType="Validation" Visible="false" />
 
             <div class="actions">
-                <%-- NOTE: When in New Payment mode, btnUpdateScheduledPayment ends up telling the HostedPaymentControl (via the js-submit-hostedpaymentinfo hook) to request a token, which will cause the _hostedPaymentInfoControl_TokenReceived postback --%>
+                <%-- NOTE: When in New Payment mode, btnUpdateScheduledPayment ends up telling the HostedPaymentControl (via the js-submit-hostedpaymentinfo hook) to request a token, which will cause the _hostedPaymentInfoControl_TokenReceived postback
+                    btnUpdateScheduledPayment_Click will only fire if using a saved payment (see $('.js-submit-hostedpaymentinfo').off().on('click').. )
+                    --%>
                 <Rock:BootstrapButton ID="btnUpdateScheduledPayment" runat="server" Text="Update" CssClass="btn btn-primary js-submit-hostedpaymentinfo" OnClick="btnUpdateScheduledPayment_Click" DataLoadingText="Updating..." />
             </div>
         </asp:Panel>
@@ -88,7 +90,7 @@
                 $('.js-submit-hostedpaymentinfo').off().on('click', function (e) {
                     // only get a payment token if prompting for a new payment
                     if ($('.js-add-payment-new').is(":visible")) {
-                        debugger
+                        // prevent the btnUpdateScheduledPayment_Click autopostback event from firing by doing stopImmediatePropagation and returning false
                         e.stopImmediatePropagation();
                         <%=HostPaymentInfoSubmitScript%>
                         return false;
