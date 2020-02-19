@@ -33,7 +33,10 @@
                     ccexp: {},
                     cvv: {
                         status: true
-                    }
+                    },
+                    checkaccount: {},
+                    checkaba: {},
+                    checkname: {}
                 }
 
                 var postbackScript = $control.attr('data-postback-script');
@@ -56,9 +59,13 @@
 
                 self.collectJSSettings = {
                     paymentSelector: '#' + controlId + ' .js-payment-button',
+                    // There is a paymentType option, but it only affects which fields get created when in Lightbox mode, so it doesn't help us since we are in inline mode
+                    // paymentType: ck,cc...
+
+                    // we are using inline mode (lightbox mode pops up a dialog to prompt for payment info)
                     variant: "inline",
 
-                    /* Placeholder Options*/
+                    /* field configuration */
                     fields: {
                         ccnumber: {
                             selector: '#' + controlId + ' .js-credit-card-input',
@@ -135,31 +142,53 @@
                     },
                     invalidCss: {
                         "border-color": "red",
-                        //"color": "white"
                     },
                     validCss: {
-                        "border-color": "green",
+                        // if we want to indicate which fields have passed validation (by CollectJS)...
+                        //"border-color": "green",
                     },
                     placeholderCss: {
                         'color': inputPlaceholderStyles('color'),
                     },
 
                     /* Callback options*/
+
+                    // CollectJS uses timeoutDuration and timeoutCallback to handle either connectivity issues, or invalid input
+                    // In other words, if input is invalid, CollectJS just times out (it doesn't tell us)
                     timeoutDuration: 4000,
                     timeoutCallback: function () {
-                        debugger
-                        console.log("The tokenization didn't respond in the expected timeframe.  This could be due to an invalid or incomplete field or poor connectivity");
-                        self.validateInputs();
+
+                        // a timeout callback will fire due to a timeout or incomplete input fields (CollectJS doesn't tell us why)
+                        console.log("The tokenization didn't respond in the expected timeframe. This could be due to an invalid or incomplete field or poor connectivity");
+
+                        // Since we don't know exactly what happened, lets see if it might be invalid inputs by checking them all manually
+                        var inputsAreValid = self.validateInputs();
+                        if (inputsAreValid) {
+
+                            // inputs seem to be valid, so show a message to let them know what seems to be happeninng
+                            console.log("Timeout happened for unknown reason, probably poor connectivity since we already validated inputs.");
+                            debugger
+                            var $validationMessage = self.$paymentValidation.find('.js-validation-message')
+                            $validationMessage.text('Response from gateway timed out. This could be do to poor connectivity or invalid payment values.');
+                            self.$paymentValidation.show();
+
+                        }
                     },
+
+                    // Collect JS will validate inputs when blurring out of fields (and it might take a second for it to fire this callback)
                     validationCallback: function (field, status, message) {
                         // if there is a validation error, keep the message and field that has the error. Then we'll check it before doing the submitPaymentInfo
                         console.log(field + ':' + status + ':' + message);
 
                         self.validationFieldStatus[field] = {
+                            field: field,
                             status: status,
                             message: message
                         };
                     },
+
+                    // After we call CollectJS.configure, we have to wait for CollectJS to create all the iframes for the input fields.
+                    // Note that it adds the inputs to the DOM one at a time, and then fires this callback when all of them have been created.
                     fieldsAvailableCallback: function (a, b, c) {
 
                         // undo temporarily moving the inputs off screen to avoid seeing input fields getting created by CollectJS
@@ -179,6 +208,8 @@
                             $achContainer.show();
                         }
                     },
+
+                    // this is the callback when the token response comes back. This callback will only happen if all the inputs are valid. To deal with an invalid input response, we have to use timeoutDuraction, timeoutCallback to find that out.
                     callback: function (resp) {
                         console.log(resp);
                         debugger
@@ -208,6 +239,11 @@
 
                     $paymentButtonCreditCard.off().on('click', function () {
                         $(this).addClass("active").siblings().removeClass("active");
+
+                        // have CollectJS clear all the input fields when the PaymentType (ach vs cc) changes. This will prevent us sending both ACH and CC payment info at the same time
+                        // CollectJS determines to use ACH vs CC by seeing which inputs have data in it. There isn't a explicit option to indicate which to use.
+                        CollectJS.clearInputs();
+
                         $creditCardContainer.show();
                         $achContainer.hide();
                     });
@@ -218,30 +254,42 @@
                     var $paymentButtonACH = $control.find('.js-payment-ach');
                     $paymentButtonACH.off().on('click', function () {
                         $(this).addClass("active").siblings().removeClass("active");
+
+                        // have CollectJS clear all the input fields when the PaymentType (ach vs cc) changes. This will prevent us sending both ACH and CC payment info at the same time
+                        // CollectJS determines to use ACH vs CC by seeing which inputs have data in it. There isn't a explicit option to indicate which to use.
+                        CollectJS.clearInputs();
+
                         $creditCardContainer.hide();
                         $achContainer.show();
                     });
                 };
 
-                if (enabledPaymentTypes.includes('card') == false) {
+                if ((enabledPaymentTypes.includes('card') == false) && $creditCardContainer) {
+                    // if the $creditCardContainer was created, but CreditCard isn't enabled, remove it from the DOM
                     $creditCardContainer.remove();
                 }
 
-                if (enabledPaymentTypes.includes('ach') == false) {
+                if ((enabledPaymentTypes.includes('ach') == false) && $achContainer) {
+                    // if the $achContainer was created, but ACH isn't enabled, remove it from the DOM
                     $achContainer.remove();
                 }
 
                 var $paymentTypeSelector = $control.find('.js-gateway-paymenttype-selector');
-                if (enabledPaymentTypes.length > 1) {
+                if ($paymentTypeSelector) {
+                    if (enabledPaymentTypes.length > 1) {
 
-                    $paymentTypeSelector.show();
-                }
-                else {
-                    $paymentTypeSelector.hide();
+                        // only show the payment type selector (tabs) if there if both ACH and CC are enabled.
+                        $paymentTypeSelector.show();
+                    }
+                    else {
+                        $paymentTypeSelector.hide();
+                    }
                 }
             },
 
 
+            // NMIHostedPaymentControl will call this when the 'Next' button is clicked
+            // use javascript setTimeout to giving validation a little bit of time to check stuff. If that doesn't stop invalid input, CollectJS will do the 'timeoutCallback' event of CollectJS if it finds invalid input after submitting the payment info.
             submitPaymentInfo: function (controlId) {
                 var self = this
                 console.log('submitPaymentInfo');
@@ -258,21 +306,32 @@
                     var $frameEl = $(CollectJS.iframes[iframeKey]);
                     if ($frameEl.hasClass('CollectJSInvalid') == true) {
                         // if a field has CollectJSInValid, is should be indicated with a red outline, or something similar
-                        //return;
+                        // NOTE: we might not need this
                     }
                 }
 
                 var validationMessage = '';
 
+                // check for both .CollectJSInvalid and also if the fields weren't validated (they are probably blank)
                 var hasInvalidFields = $('.CollectJSInvalid').length > 0;
 
-                var validationFieldTitle = ''
                 for (var validationFieldKey in self.validationFieldStatus) {
+                    debugger
+                    //if (CollectJS)
                     var validationField = self.validationFieldStatus[validationFieldKey];
-                    if (!validationField.status) {
+                    // first check visibility. If this is an ACH field, but we are in CC mode (and vice versa), don't validate
+                    var fieldVisible = $(CollectJS.config.fields[validationFieldKey].selector).is(':visible');
+                    if (fieldVisible && !validationField.status) {
                         hasInvalidFields = true;
-                        validationFieldTitle = CollectJS.config.fields[validationFieldKey].title;
-                        validationMessage = validationField.message || validationFieldTitle + ' cannot be blank';
+                        var validationFieldTitle = CollectJS.config.fields[validationFieldKey].title;
+                        var isBlank = !validationField.message || validationField.message == 'Field is empty'
+                        if (isBlank) {
+                            validationMessage = validationFieldTitle + ' cannot be blank';
+                        }
+                        else {
+                            validationMessage = validationField.message || 'unknown validation error';
+                        }
+
                         break;
                     }
                 }
@@ -282,24 +341,17 @@
                     var $validationMessage = self.$paymentValidation.find('.js-validation-message')
                     $validationMessage.text(validationMessage);
                     self.$paymentValidation.show();
+                    return false;
                 }
                 else {
                     self.$paymentValidation.hide();
+                    return true;
                 }
             },
 
             // Tells the gatewayTokenizer to submit the entered info so that we can get a token (or error, etc) in the response
-            // ToDo, we might want to do wait to make sure validation events are fired
             startSubmitPaymentInfo: function (self, controlId) {
-
-                console.log('startSubmitPaymentInfo');
-                debugger
-
                 CollectJS.startPaymentRequest();
-                return;
-
-
-
             }
         }
 

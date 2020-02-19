@@ -33,6 +33,11 @@ namespace Rock.NMI.Controls
     /// <seealso cref="System.Web.UI.INamingContainer" />
     public class NMIHostedPaymentControl : CompositeControl, INamingContainer, Rock.Financial.IHostedGatewayPaymentControlTokenEvent
     {
+        private static class ViewStateKey
+        {
+            public const string EnabledPaymentTypes = "EnabledPaymentTypes";
+        }
+
         #region Controls
 
         private HiddenFieldWithClass _hfPaymentInfoToken;
@@ -54,7 +59,6 @@ namespace Rock.NMI.Controls
         private Panel _paymentTypeSelector;
         private Panel _gatewayCreditCardContainer;
         private Panel _gatewayACHContainer;
-
 
         #endregion
 
@@ -79,8 +83,12 @@ namespace Rock.NMI.Controls
         {
             set
             {
-                EnsureChildControls();
-                _hfEnabledPaymentTypesJSON.Value = value.Select( a => a.ConvertToString() ).ToJson();
+                ViewState[ViewStateKey.EnabledPaymentTypes] = value;
+            }
+
+            private get
+            {
+                return ViewState[ViewStateKey.EnabledPaymentTypes] as NMIPaymentType[];
             }
         }
 
@@ -254,14 +262,18 @@ namespace Rock.NMI.Controls
             _hfEnabledPaymentTypesJSON = new HiddenFieldWithClass() { ID = "_hfEnabledPaymentTypesJSON", CssClass = "js-enabled-payment-types" };
             Controls.Add( _hfEnabledPaymentTypesJSON );
 
+            _hfEnabledPaymentTypesJSON.Value = this.EnabledPaymentTypes.ToJson();
+
             _hfSelectedPaymentType = new HiddenFieldWithClass() { ID = "_hfSelectedPaymentType", CssClass = "js-selected-payment-type" };
             Controls.Add( _hfSelectedPaymentType );
 
-            
-            /* Payment Type Selector*/
-            Literal lPaymentSelectorHTML = new Literal() { ID = "lPaymentSelectorHTML" };
 
-            lPaymentSelectorHTML.Text = $@"
+            /* Payment Type Selector*/
+            if ( EnabledPaymentTypes.Length > 1 )
+            {
+                Literal lPaymentSelectorHTML = new Literal() { ID = "lPaymentSelectorHTML" };
+
+                lPaymentSelectorHTML.Text = $@"
 <div class='gateway-type-selector btn-group btn-group-justified' role='group'>
     <a class='btn btn-default active js-payment-creditcard payment-creditcard' runat='server'>
         Card
@@ -271,45 +283,51 @@ namespace Rock.NMI.Controls
     </a>
 </div>";
 
-            _paymentTypeSelector = new Panel() { ID = "_paymentTypeSelector", CssClass = "js-gateway-paymenttype-selector gateway-paymenttype-selector" };
-            _paymentTypeSelector.Controls.Add( lPaymentSelectorHTML );
-            Controls.Add( _paymentTypeSelector );
+                _paymentTypeSelector = new Panel() { ID = "_paymentTypeSelector", CssClass = "js-gateway-paymenttype-selector gateway-paymenttype-selector" };
+                _paymentTypeSelector.Controls.Add( lPaymentSelectorHTML );
+                Controls.Add( _paymentTypeSelector );
+            }
 
             var pnlPaymentInputs = new Panel { ID = "pnlPaymentInputs", CssClass = "js-nmi-payment-inputs nmi-payment-inputs" };
 
             /* Credit Card Inputs */
-            _gatewayCreditCardContainer = new Panel() { ID = "_gatewayCreditCardContainer", CssClass = "gateway-creditcard-container js-gateway-creditcard-container" };
-            pnlPaymentInputs.Controls.Add( _gatewayCreditCardContainer );
+            if ( EnabledPaymentTypes.Contains( NMIPaymentType.card ) )
+            {
+                _gatewayCreditCardContainer = new Panel() { ID = "_gatewayCreditCardContainer", CssClass = "gateway-creditcard-container js-gateway-creditcard-container" };
+                pnlPaymentInputs.Controls.Add( _gatewayCreditCardContainer );
 
+                _divCreditCardNumber = new HtmlGenericControl( "div" );
+                _divCreditCardNumber.AddCssClass( "js-credit-card-input credit-card-input" );
+                _gatewayCreditCardContainer.Controls.Add( _divCreditCardNumber );
 
-            _divCreditCardNumber = new HtmlGenericControl( "div" );
-            _divCreditCardNumber.AddCssClass( "js-credit-card-input credit-card-input" );
-            _gatewayCreditCardContainer.Controls.Add( _divCreditCardNumber );
+                _divCreditCardExp = new HtmlGenericControl( "div" );
+                _divCreditCardExp.AddCssClass( "js-credit-card-exp-input credit-card-exp-input" );
+                _gatewayCreditCardContainer.Controls.Add( _divCreditCardExp );
 
-            _divCreditCardExp = new HtmlGenericControl( "div" );
-            _divCreditCardExp.AddCssClass( "js-credit-card-exp-input credit-card-exp-input" );
-            _gatewayCreditCardContainer.Controls.Add( _divCreditCardExp );
-
-            _divCreditCardCVV = new HtmlGenericControl( "div" );
-            _divCreditCardCVV.AddCssClass( "js-credit-card-cvv-input credit-card-cvv-input" );
-            _gatewayCreditCardContainer.Controls.Add( _divCreditCardCVV );
+                _divCreditCardCVV = new HtmlGenericControl( "div" );
+                _divCreditCardCVV.AddCssClass( "js-credit-card-cvv-input credit-card-cvv-input" );
+                _gatewayCreditCardContainer.Controls.Add( _divCreditCardCVV );
+            }
 
 
             /* ACH Inputs */
-            _gatewayACHContainer = new Panel() { ID = "_gatewayACHContainer", CssClass = "gateway-ach-container js-gateway-ach-container" };
-            pnlPaymentInputs.Controls.Add( _gatewayACHContainer );
+            if ( EnabledPaymentTypes.Contains( NMIPaymentType.ach ) )
+            {
+                _gatewayACHContainer = new Panel() { ID = "_gatewayACHContainer", CssClass = "gateway-ach-container js-gateway-ach-container" };
+                pnlPaymentInputs.Controls.Add( _gatewayACHContainer );
 
-            _divCheckAccountNumber = new HtmlGenericControl( "div" );
-            _divCheckAccountNumber.AddCssClass( "js-check-account-number-input check-account-number-input" );
-            _gatewayACHContainer.Controls.Add( _divCheckAccountNumber );
+                _divCheckAccountNumber = new HtmlGenericControl( "div" );
+                _divCheckAccountNumber.AddCssClass( "js-check-account-number-input check-account-number-input" );
+                _gatewayACHContainer.Controls.Add( _divCheckAccountNumber );
 
-            _divCheckRoutingNumber = new HtmlGenericControl( "div" );
-            _divCheckRoutingNumber.AddCssClass( "js-check-routing-number-input check-routing-number-input" );
-            _gatewayACHContainer.Controls.Add( _divCheckRoutingNumber );
+                _divCheckRoutingNumber = new HtmlGenericControl( "div" );
+                _divCheckRoutingNumber.AddCssClass( "js-check-routing-number-input check-routing-number-input" );
+                _gatewayACHContainer.Controls.Add( _divCheckRoutingNumber );
 
-            _divCheckFullName = new HtmlGenericControl( "div" );
-            _divCheckFullName.AddCssClass( "js-check-fullname-input check-fullname-input" );
-            _gatewayACHContainer.Controls.Add( _divCheckFullName );
+                _divCheckFullName = new HtmlGenericControl( "div" );
+                _divCheckFullName.AddCssClass( "js-check-fullname-input check-fullname-input" );
+                _gatewayACHContainer.Controls.Add( _divCheckFullName );
+            }
 
             /* Submit Payment */
 

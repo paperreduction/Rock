@@ -40,7 +40,9 @@ namespace Rock.NMI
     /// <summary>
     /// NMI Payment Gateway
     /// </summary>
-    [Description( "NMI Gateway" )]
+    [DisplayName( "NMI Gateway" )]
+    [Description( "" )]
+
     [Export( typeof( GatewayComponent ) )]
     [ExportMetadata( "ComponentName", "NMI Gateway" )]
 
@@ -82,35 +84,33 @@ namespace Rock.NMI
         DefaultValue = "https://secure.networkmerchants.com/api/query.php",
         Order = 4 )]
 
+    [BooleanField(
+        "Prompt for Name On Card",
+        Key = AttributeKey.PromptForName,
+        Description = "Should users be prompted to enter name on the card. This only applies when using the Three Step API.",
+        DefaultBooleanValue = false,
+        Order = 5 )]
+
+    [BooleanField(
+        "Prompt for Billing Address",
+        Key = AttributeKey.PromptForAddress,
+        Description = "Should users be prompted to enter billing address. This only applies when using the Three Step API.",
+        DefaultBooleanValue = false,
+        Order = 6 )]
+
     [TextField( "Direct Post API URL",
         Key = AttributeKey.DirectPostAPIUrl,
         Description = "The URL of the NMI Direct Post Query API",
         IsRequired = true,
         DefaultValue = "https://secure.nmi.com/api/transact.php",
-        Order = 5 )]
+        Order = 7 )]
 
     [TextField( "Tokenization Key",
         Key = AttributeKey.TokenizationKey,
         Description = "The Public Security Key to use for Tokenization. This is required for when using the NMI Hosted Gateway.",
         IsRequired = false,
         DefaultValue = "",
-        Order = 6 )]
-
-    [BooleanField(
-        "Prompt for Name On Card",
-        Key = AttributeKey.PromptForName,
-        Description = "Should users be prompted to enter name on the card",
-        DefaultBooleanValue = false,
         Order = 8 )]
-
-    [BooleanField(
-        "Prompt for Billing Address",
-        Key = AttributeKey.PromptForAddress,
-        Description = "Should users be prompted to enter billing address",
-        DefaultBooleanValue = false,
-        Order = 9 )]
-
-
     public class Gateway : GatewayComponent, IThreeStepGatewayComponent, IHostedGatewayComponent
     {
         #region Attribute Keys
