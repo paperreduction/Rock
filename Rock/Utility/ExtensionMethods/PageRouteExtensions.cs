@@ -110,13 +110,22 @@ namespace Rock
 
             /*
                 2020-02-12 ETD
-                We need to check for an existing route but a simple string compare is not good enough, as variable names should be
-                able to vary. e.g. one site has entity/{id} and another has entity/{guid} these should both be in the same route
-                with different datatokens. Otherwise the first match is used and no domain matching logic can take place.
+                Rock needs to compare routes and group them for the domain matching logic. The same route on two or more different sites
+                need to be group together under one route, with each page-route having a DataToken in that route. Since IIS only matches
+                the static portion of the route Rock must also only match the static portion of the route. A simple string compare will
+                not work since a variable name can vary and create two different routes instead of one grouped route. e.g. one site
+                has entity/{id} and another has entity/{guid}.
 
-                This is one route with two "PageRoute" DataTokens so there is only one URL. If RouteTable.Routes is inspected only
-                one of the variable names is displayed. In the example above both pages are grouped under the route URL entity/{id}.
-                However to the user in the UI it is still displayed as two seperate routes since it is two different PageRoute objects.
+                While the variable name is not significant their existance is. So before comparing two routes to see if they are
+                the same Rock will first remove the contents of the brackets.  e.g. checkin/{KioskId}/{CheckinConfigId}/{GroupTypeIds}
+                is converted to checkin/{}/{}/{}. Then a case insensitive compare is done between the routes. This removes the
+                possible variations in variable names and allows the static contents to be compared and the routes grouped correctly. 
+
+                Note: Since grouped routes are under the same URL only the first one is displayed in RouteTable.Routes.
+                So in this example both pages are grouped under the route URL entity/{id}. In the UI they are
+                still displayed as seperate routes since it is two different PageRoute objects.
+
+                This was done to resolve issue: https://github.com/SparkDevNetwork/Rock/issues/4102
              */
 
             var reg = new System.Text.RegularExpressions.Regex( @"\{.*?\}" );
