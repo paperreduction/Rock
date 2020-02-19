@@ -283,7 +283,7 @@ TransactionAccountDetails: [
 
         protected bool DisplayPhone
         {
-            get {return ViewState["DisplayPhone"].ToString().AsBoolean(); }
+            get { return ViewState["DisplayPhone"].ToString().AsBoolean(); }
             set { ViewState["DisplayPhone"] = value; }
         }
         #endregion
@@ -461,10 +461,25 @@ TransactionAccountDetails: [
                 return;
             }
 
-            if ( ( _ccGatewayComponent is IHostedGatewayComponent ) || _achGatewayComponent is IHostedGatewayComponent )
+            var ccHostedGatewayComponent = _ccGatewayComponent as IHostedGatewayComponent;
+            var achHostedGatewayComponent = _achGatewayComponent as IHostedGatewayComponent;
+            bool gatewaySupportsUnhostedPayment = true;
+
+            if ( ccHostedGatewayComponent != null && !ccHostedGatewayComponent.GetHostedGatewayModes( _ccGateway ).Contains( HostedGatewayMode.Unhosted ) )
             {
+                gatewaySupportsUnhostedPayment = false;
+            }
+
+            if ( achHostedGatewayComponent != null && !achHostedGatewayComponent.GetHostedGatewayModes( _achGateway ).Contains( HostedGatewayMode.Unhosted ) )
+            {
+                gatewaySupportsUnhostedPayment = false;
+            }
+
+            if ( !gatewaySupportsUnhostedPayment )
+            {
+
                 SetPage( 0 );
-                ShowMessage( NotificationBoxType.Danger, "Configuration Error", "Unsupported Gateway. This block does not support Gateways that have a hosted payment interface." );
+                ShowMessage( NotificationBoxType.Danger, "Configuration Error", "Unsupported Gateway. This block does only supports Gateways that have a un-hosted payment interface." );
                 return;
             }
 
@@ -543,7 +558,7 @@ TransactionAccountDetails: [
             }
 
             // Update the total amount
-            lblTotalAmount.Text = GlobalAttributesCache.Value("CurrencySymbol") + SelectedAccounts.Sum( f => f.Amount ).ToString( "F2" );
+            lblTotalAmount.Text = GlobalAttributesCache.Value( "CurrencySymbol" ) + SelectedAccounts.Sum( f => f.Amount ).ToString( "F2" );
 
             // Set the frequency date label based on if 'One Time' is selected or not
             if ( btnFrequency.Items.Count > 0 )
@@ -883,7 +898,7 @@ TransactionAccountDetails: [
 
                         if ( !ScheduleId.HasValue )
                         {
-                            var transaction = new FinancialTransactionService( rockContext ).GetByTransactionCode( (financialGateway != null ? financialGateway.Id : (int?)null), TransactionCode );
+                            var transaction = new FinancialTransactionService( rockContext ).GetByTransactionCode( ( financialGateway != null ? financialGateway.Id : ( int? ) null ), TransactionCode );
                             if ( transaction != null && transaction.AuthorizedPersonAlias != null )
                             {
                                 if ( transaction.FinancialGateway != null )
@@ -1741,7 +1756,7 @@ TransactionAccountDetails: [
                         !string.IsNullOrWhiteSpace( txtLastName.Text ) )
                     {
                         // Same logic as PledgeEntry.ascx.cs
-                        var personQuery = new PersonService.PersonMatchQuery( txtFirstName.Text, txtLastName.Text, txtEmail.Text, pnbPhone.Text.Trim());
+                        var personQuery = new PersonService.PersonMatchQuery( txtFirstName.Text, txtLastName.Text, txtEmail.Text, pnbPhone.Text.Trim() );
                         person = personService.FindPerson( personQuery, true );
                     }
 
@@ -2905,7 +2920,7 @@ TransactionAccountDetails: [
                 History.EvaluateChange( batchChanges, "Status", null, batch.Status );
                 History.EvaluateChange( batchChanges, "Start Date/Time", null, batch.BatchStartDateTime );
                 History.EvaluateChange( batchChanges, "End Date/Time", null, batch.BatchEndDateTime );
-            }            
+            }
 
             transaction.LoadAttributes( rockContext );
 
@@ -2926,7 +2941,7 @@ TransactionAccountDetails: [
             {
                 rockContext.SaveChanges();
             }
-            
+
             transaction.BatchId = batch.Id;
 
             // use the financialTransactionService to add the transaction instead of batch.Transactions to avoid lazy-loading the transactions already associated with the batch
@@ -3078,10 +3093,18 @@ TransactionAccountDetails: [
                 NotificationBox nb = nbMessage;
                 switch ( hfCurrentPage.Value.AsInteger() )
                 {
-                    case 1: nb = nbSelectionMessage; break;
-                    case 2: nb = nbSelectionMessage; break;
-                    case 3: nb = nbConfirmationMessage; break;
-                    case 4: nb = nbSuccessMessage; break;
+                    case 1:
+                        nb = nbSelectionMessage;
+                        break;
+                    case 2:
+                        nb = nbSelectionMessage;
+                        break;
+                    case 3:
+                        nb = nbConfirmationMessage;
+                        break;
+                    case 4:
+                        nb = nbSuccessMessage;
+                        break;
                 }
 
                 nb.Text = text;

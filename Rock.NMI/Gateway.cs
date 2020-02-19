@@ -96,19 +96,28 @@ namespace Rock.NMI
         DefaultValue = "",
         Order = 6 )]
 
+    [EnumsField( "Hosted Gateway Modes",
+        Key = AttributeKey.HostedGatewayModes,
+        Description = "The hosted gateway modes that should be supported",
+        EnumSourceType = typeof( HostedGatewayMode ),
+        DefaultValue = "0",
+        Order = 7 )]
+
     [BooleanField(
         "Prompt for Name On Card",
         Key = AttributeKey.PromptForName,
         Description = "Should users be prompted to enter name on the card",
         DefaultBooleanValue = false,
-        Order = 7 )]
+        Order = 8 )]
 
     [BooleanField(
         "Prompt for Billing Address",
         Key = AttributeKey.PromptForAddress,
         Description = "Should users be prompted to enter billing address",
         DefaultBooleanValue = false,
-        Order = 8 )]
+        Order = 9 )]
+
+
     public class Gateway : GatewayComponent, IThreeStepGatewayComponent, IHostedGatewayComponent
     {
         #region Attribute Keys
@@ -128,6 +137,7 @@ namespace Rock.NMI
             public const string QueryUrl = "QueryUrl";
             public const string DirectPostAPIUrl = "DirectPostAPIUrl";
             public const string TokenizationKey = "TokenizationKey";
+            public const string HostedGatewayModes = "EnabledHostedGatewayModes";
             public const string PromptForName = "PromptForName";
             public const string PromptForAddress = "PromptForAddress";
         }
@@ -1417,9 +1427,40 @@ namespace Rock.NMI
 
         #region IHostedGatewayComponent
 
+        /// <summary>
+        /// Gets the URL that the Gateway Information UI will navigate to when they click the 'Configure' link
+        /// </summary>
+        /// <value>
+        /// The configure URL.
+        /// </value>
         public string ConfigureURL => "https://www.nmi.com/";
 
+        /// <summary>
+        /// Gets the URL that the Gateway Information UI will navigate to when they click the 'Learn More' link
+        /// </summary>
+        /// <value>
+        /// The learn more URL.
+        /// </value>
         public string LearnMoreURL => "https://www.nmi.com/";
+
+        /// <summary>
+        /// Gets the hosted gateway modes that this gateway has enabled
+        /// </summary>
+        /// <value>
+        /// The hosted gateway modes.
+        /// </value>
+        public HostedGatewayMode[] GetHostedGatewayModes( FinancialGateway financialGateway )
+        {
+            var hostedGatewayModes = this.GetAttributeValue( financialGateway, AttributeKey.HostedGatewayModes )?.Split( ',' ).Select( a => a.ConvertToEnumOrNull<HostedGatewayMode>() ).Where( a => a != null ).Select( a => a.Value ).ToList();
+            if ( hostedGatewayModes == null )
+            {
+                return new HostedGatewayMode[1] { HostedGatewayMode.Unhosted };
+            }
+            else
+            {
+                return hostedGatewayModes.ToArray();
+            }
+        }
 
         /// <summary>
         /// Gets the hosted payment information control which will be used to collect CreditCard, ACH fields

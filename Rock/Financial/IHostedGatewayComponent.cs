@@ -24,6 +24,7 @@ namespace Rock.Financial
     /// A Financial gateway provider that supports collecting Payment Info (Credit Card Number fields or ACH fields) in the browser.
     /// An IHostedGatewayComponent will return a token in the browser client instead of sending payment info to the Rock Server.
     /// </summary>
+    /// <seealso cref="Rock.Financial.IGatewayComponent" />
     public interface IHostedGatewayComponent: IGatewayComponent
     {
         /// <summary>
@@ -86,6 +87,13 @@ namespace Rock.Financial
         /// <param name="financialGateway">The financial gateway.</param>
         /// <returns></returns>
         DateTime GetEarliestScheduledStartDate( FinancialGateway financialGateway );
-        
+
+        /// <summary>
+        /// Gets the hosted gateway modes that this gateway has enabled
+        /// </summary>
+        /// <value>
+        /// The hosted gateway modes.
+        /// </value>
+        HostedGatewayMode[] GetHostedGatewayModes( FinancialGateway financialGateway );
     }
 }

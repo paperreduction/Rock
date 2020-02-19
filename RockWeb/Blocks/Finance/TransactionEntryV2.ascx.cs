@@ -1004,7 +1004,8 @@ mission. We are so grateful for your commitment.</p>
             }
 
             // get the FinancialGateway's GatewayComponent so we can show a warning if they have an unsupported gateway.
-            bool unsupportedGateway = ( FinancialGateway.GetGatewayComponent() is IHostedGatewayComponent ) == false;
+            var hostedGatewayComponent = FinancialGateway.GetGatewayComponent() as IHostedGatewayComponent;
+            bool unsupportedGateway = ( hostedGatewayComponent == null || !hostedGatewayComponent.GetHostedGatewayModes( FinancialGateway ).Contains( HostedGatewayMode.Hosted ) );
 
             var testGatewayGuid = Rock.SystemGuid.EntityType.FINANCIAL_GATEWAY_TEST_GATEWAY.AsGuid();
 
@@ -2050,8 +2051,8 @@ mission. We are so grateful for your commitment.</p>
 
             bool enableACH = this.GetAttributeValue( AttributeKey.EnableACH ).AsBoolean();
             bool enableCreditCard = this.GetAttributeValue( AttributeKey.EnableCreditCard ).AsBoolean();
-            var creditCardCurrency = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.CURRENCY_TYPE_CREDIT_CARD.AsGuid());
-            var achCurrency = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.CURRENCY_TYPE_ACH.AsGuid());
+            var creditCardCurrency = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.CURRENCY_TYPE_CREDIT_CARD.AsGuid() );
+            var achCurrency = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.CURRENCY_TYPE_ACH.AsGuid() );
             List<DefinedValueCache> allowedCurrencyTypes = new List<DefinedValueCache>();
 
             if ( enableCreditCard && financialGatewayComponent.SupportsSavedAccount( creditCardCurrency ) )

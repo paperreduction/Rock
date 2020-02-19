@@ -49,6 +49,12 @@ namespace Rock.NMI.Controls
         private HtmlGenericControl _aPaymentButton;
         private HtmlGenericControl _divValidationMessage;
 
+        private TextBox _hiddenInputStyleHook;
+
+        private Panel _paymentTypeSelector;
+        private Panel _gatewayCreditCardContainer;
+        private Panel _gatewayACHContainer;
+
 
         #endregion
 
@@ -144,10 +150,16 @@ namespace Rock.NMI.Controls
             // Script that lets us use the CollectJS API (see https://secure.tnbcigateway.com/merchants/resources/integration/integration_portal.php?#cjs_methodology)
             var additionalAttributes = new Dictionary<string, string>();
             additionalAttributes.Add( "data-tokenization-key", this.TokenizationKey );
+            additionalAttributes.Add( "data-variant", "inline" );
             RockPage.AddScriptSrcToHead( this.Page, "nmiCollectJS", $"https://secure.tnbcigateway.com/token/Collect.js", additionalAttributes );
 
             // Script that contains the initializeTokenizer scripts for us to use on the client
-            ScriptManager.RegisterClientScriptBlock( this, this.GetType(), "nmiGatewayCollectJSBlock", Scripts.gatewayCollectJS, true );
+            //Page.ClientScript.RegisterClientScriptBlock( this.Page.GetType(), "nmiGatewayCollectJSBlock", Scripts.gatewayCollectJS, true );
+            //Page.ClientScript.RegisterStartupScript( this.Page.GetType(), "nmiGatewayCollectJSStartup", $"Rock.NMI.controls.gatewayCollectJS.initialize('{this.ClientID}');", true );
+            if ( !Page.IsPostBack )
+            {
+                ScriptManager.RegisterClientScriptBlock( this, this.GetType(), "nmiGatewayCollectJSBlock", Scripts.gatewayCollectJS, true );
+            }
 
             ScriptManager.RegisterStartupScript( this, this.GetType(), "nmiGatewayCollectJSStartup", $"Rock.NMI.controls.gatewayCollectJS.initialize('{this.ClientID}');", true );
 
@@ -245,32 +257,61 @@ namespace Rock.NMI.Controls
             _hfSelectedPaymentType = new HiddenFieldWithClass() { ID = "_hfSelectedPaymentType", CssClass = "js-selected-payment-type" };
             Controls.Add( _hfSelectedPaymentType );
 
+            
+            /* Payment Type Selector*/
+            Literal lPaymentSelectorHTML = new Literal() { ID = "lPaymentSelectorHTML" };
+
+            lPaymentSelectorHTML.Text = $@"
+<div class='gateway-type-selector btn-group btn-group-justified' role='group'>
+    <a class='btn btn-default active js-payment-creditcard payment-creditcard' runat='server'>
+        Card
+    </a>
+    <a class='btn btn-default js-payment-ach payment-ach' runat='server'>
+        Bank Account
+    </a>
+</div>";
+
+            _paymentTypeSelector = new Panel() { ID = "_paymentTypeSelector", CssClass = "js-gateway-paymenttype-selector gateway-paymenttype-selector" };
+            _paymentTypeSelector.Controls.Add( lPaymentSelectorHTML );
+            Controls.Add( _paymentTypeSelector );
+
             var pnlPaymentInputs = new Panel { ID = "pnlPaymentInputs", CssClass = "js-nmi-payment-inputs nmi-payment-inputs" };
 
-            
+            /* Credit Card Inputs */
+            _gatewayCreditCardContainer = new Panel() { ID = "_gatewayCreditCardContainer", CssClass = "gateway-creditcard-container js-gateway-creditcard-container" };
+            pnlPaymentInputs.Controls.Add( _gatewayCreditCardContainer );
+
+
             _divCreditCardNumber = new HtmlGenericControl( "div" );
             _divCreditCardNumber.AddCssClass( "js-credit-card-input credit-card-input" );
-            pnlPaymentInputs.Controls.Add( _divCreditCardNumber );
+            _gatewayCreditCardContainer.Controls.Add( _divCreditCardNumber );
 
             _divCreditCardExp = new HtmlGenericControl( "div" );
             _divCreditCardExp.AddCssClass( "js-credit-card-exp-input credit-card-exp-input" );
-            pnlPaymentInputs.Controls.Add( _divCreditCardExp );
+            _gatewayCreditCardContainer.Controls.Add( _divCreditCardExp );
 
             _divCreditCardCVV = new HtmlGenericControl( "div" );
             _divCreditCardCVV.AddCssClass( "js-credit-card-cvv-input credit-card-cvv-input" );
-            pnlPaymentInputs.Controls.Add( _divCreditCardCVV );
+            _gatewayCreditCardContainer.Controls.Add( _divCreditCardCVV );
+
+
+            /* ACH Inputs */
+            _gatewayACHContainer = new Panel() { ID = "_gatewayACHContainer", CssClass = "gateway-ach-container js-gateway-ach-container" };
+            pnlPaymentInputs.Controls.Add( _gatewayACHContainer );
 
             _divCheckAccountNumber = new HtmlGenericControl( "div" );
             _divCheckAccountNumber.AddCssClass( "js-check-account-number-input check-account-number-input" );
-            //pnlPaymentInputs.Controls.Add( _divCheckAccountNumber );
+            _gatewayACHContainer.Controls.Add( _divCheckAccountNumber );
 
             _divCheckRoutingNumber = new HtmlGenericControl( "div" );
             _divCheckRoutingNumber.AddCssClass( "js-check-routing-number-input check-routing-number-input" );
-            //pnlPaymentInputs.Controls.Add( _divCheckRoutingNumber );
+            _gatewayACHContainer.Controls.Add( _divCheckRoutingNumber );
 
             _divCheckFullName = new HtmlGenericControl( "div" );
             _divCheckFullName.AddCssClass( "js-check-fullname-input check-fullname-input" );
-            //pnlPaymentInputs.Controls.Add( _divCheckFullName );
+            _gatewayACHContainer.Controls.Add( _divCheckFullName );
+
+            /* Submit Payment */
 
             // collectJs needs a payment button to work, so add it but don't show it
             _aPaymentButton = new HtmlGenericControl( "button" );
@@ -287,6 +328,15 @@ namespace Rock.NMI.Controls
 <li><span class='js-validation-message'></span></li>
 </ul>";
             pnlPaymentInputs.Controls.Add( _divValidationMessage );
+
+            _hiddenInputStyleHook = new TextBox();
+            _hiddenInputStyleHook.Attributes["class"] = "js-input-style-hook form-control nmi-input-style-hook form-group";
+            _hiddenInputStyleHook.Style["display"] = "none";
+
+            // set text so that placeholder css can be jquery'd
+            _hiddenInputStyleHook.Attributes["placeholder"] = "placeholder text hook";
+            
+            Controls.Add( _hiddenInputStyleHook );
 
             Controls.Add( pnlPaymentInputs );
         }

@@ -305,6 +305,17 @@ namespace Rock.TransNational.Pi
         public string ConfigureURL => "https://www.mywell.org/get-started/";
 
         /// <summary>
+        /// Gets the hosted gateway modes that this gateway has enabled
+        /// </summary>
+        /// <value>
+        /// The hosted gateway modes.
+        /// </value>
+        public HostedGatewayMode[] GetHostedGatewayModes( FinancialGateway financialGateway )
+        {
+            return new HostedGatewayMode[1] { HostedGatewayMode.Hosted }; 
+        }
+
+        /// <summary>
         /// Creates the customer account using a token received from the HostedPaymentInfoControl <seealso cref="M:Rock.Financial.IHostedGatewayComponent.GetHostedPaymentInfoControl(Rock.Model.FinancialGateway,System.Boolean,System.String)" />
         /// and returns a customer account token that can be used for future transactions.
         /// </summary>

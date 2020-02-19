@@ -902,9 +902,12 @@ The logged-in person's information will be used to complete the registrar inform
                 {
                     if ( financialGateway.GetGatewayComponent() is Rock.Financial.IHostedGatewayComponent )
                     {
-                        nbValidationError.Text = "Unsupported Gateway. Registration doesn't currently support Gateways that have a hosted payment interface.";
-                        nbValidationError.Visible = true;
-                        return;
+                        if ( !( financialGateway.GetGatewayComponent() as Rock.Financial.IHostedGatewayComponent ).GetHostedGatewayModes( financialGateway ).Contains( Rock.Financial.HostedGatewayMode.Unhosted ) )
+                        {
+                            nbValidationError.Text = "Unsupported Gateway. Registration currently only supports Gateways that have an un-hosted payment interface.";
+                            nbValidationError.Visible = true;
+                            return;
+                        }
                     }
                 }
             }
