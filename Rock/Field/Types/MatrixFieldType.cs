@@ -400,8 +400,9 @@ namespace Rock.Field.Types
                     if ( guid != null )
                     {
                         var service = new AttributeMatrixService( rockContext );
+                        var itemService = new AttributeMatrixItemService( rockContext );
                         var item = service.Get( guid.Value );
-                        foreach(var matrixItem in item.AttributeMatrixItems )
+                        foreach ( var matrixItem in item.AttributeMatrixItems )
                         {
                             matrixItem.LoadAttributes();
                         }
@@ -416,20 +417,32 @@ namespace Rock.Field.Types
                         newItem.AttributeMatrixTemplate.CreatedDateTime = RockDateTime.Now;
                         newItem.AttributeMatrixTemplate.ModifiedDateTime = RockDateTime.Now;
 
-                        foreach(var matrixItem in newItem.AttributeMatrixItems )
+                        foreach ( var matrixItem in newItem.AttributeMatrixItems )
                         {
                             matrixItem.Guid = Guid.NewGuid();
                             matrixItem.CreatedDateTime = RockDateTime.Now;
                             matrixItem.ModifiedDateTime = RockDateTime.Now;
-                        }
 
-                        foreach ( var key in matrixItem.Attributes.Keys )
-                        {
-                            var mav = matrixItem.GetAttributeValue( key );
-                            matrixItem.SetAttributeValue( key, mav );
+                            itemService.Add( matrixItem );
                         }
-
                         service.Add( newItem );
+
+                        rockContext.SaveChanges();
+
+                        for ( var i = 0; i < newItem.AttributeMatrixItems.Count; i++ )
+                        {
+                            var originalMatrixItem = item.AttributeMatrixItems.ToList()[i];
+                            var newMatrixItem = newItem.AttributeMatrixItems.ToList()[i];
+
+                            foreach ( var key in newMatrixItem.Attributes.Keys )
+                            {
+                                var mav = originalMatrixItem.GetAttributeValue( key );
+                                newMatrixItem.SetAttributeValue( key, mav );
+                                
+                            }
+
+                            newMatrixItem.SaveAttributeValues( rockContext );
+                        }
 
                         return newItem.Guid.ToString();
                     }
