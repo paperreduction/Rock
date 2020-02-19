@@ -316,7 +316,7 @@
                     <a id="RangeSlider"></a>
                     <h2>Range Slider</h2>
                     <div runat="server" class="r-example">
-                        <Rock:RangeSlider ID="rsSlider" runat="server" Label="Rock:RangeSlider" MaxValue="250" MinValue="125" SelectedValue="200" />
+                        <Rock:RangeSlider ID="rsSlider" runat="server" Label="Rock:RangeSlider" MaxValue="250" MinValue="125" StepValue="5" SelectedValue="200" />
                         <br />
                     </div>
 
@@ -396,12 +396,12 @@
 
                     <a id="CampusPicker"></a>
                     <div runat="server" class="r-example">
-                        <Rock:CampusPicker ID="campExample" runat="server" Label="Rock:CampusPicker" />
+                        <Rock:CampusPicker ID="campExample" runat="server" Label="Rock:CampusPicker" ForceVisible="true" />
                     </div>
 
                     <a id="CampusesPicker"></a>
                     <div runat="server" class="r-example">
-                        <Rock:CampusesPicker ID="campsExample" runat="server" Label="Rock:CampusesPicker" />
+                        <Rock:CampusesPicker ID="campsExample" runat="server" Label="Rock:CampusesPicker" ForceVisible="true" />
                     </div>
 
                     <a id="Connections"></a>

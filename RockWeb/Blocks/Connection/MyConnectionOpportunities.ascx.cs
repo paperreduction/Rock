@@ -147,7 +147,7 @@ namespace RockWeb.Blocks.Connection
             this.AddConfigurationUpdateTrigger( upnlContent );
 
             string deleteScript = @"
-    $('table.js-grid-requests a.grid-delete-button').click(function( e ){
+    $('table.js-grid-requests a.grid-delete-button').on('click', function( e ){
         e.preventDefault();
         Rock.dialogs.confirm('Are you sure you want to delete this connection request? All of the activities for this request will also be deleted, and any existing workflow associations will be lost!', function (result) {
             if (result) {
@@ -420,6 +420,10 @@ namespace RockWeb.Blocks.Connection
                 else if ( e.Key == MakeKeyUniqueToOpportunity( "LastActivity" ) )
                 {
                     e.Value = ResolveValues( e.Value, cblLastActivity );
+                }
+                else if ( e.Key == "LastActivityDateRange" )
+                {
+                    e.Value = SlidingDateRangePicker.FormatDelimitedValues( e.Value );
                 }
                 else
                 {
@@ -1062,6 +1066,10 @@ namespace RockWeb.Blocks.Connection
                             connectionRequests = connectionRequests.OrderBy( a => a.LastActivityDateTime ).ToList();
                         }
                     }
+
+                    // Hide the campus column if the campus filter is not visible.
+                    gRequests.ColumnsOfType<RockBoundField>().First( c => c.DataField == "Campus" ).Visible = cpCampusFilterForPage.Visible;
+
                     gRequests.DataSource = connectionRequests;
                     gRequests.DataBind();
 
