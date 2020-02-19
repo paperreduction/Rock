@@ -1190,9 +1190,9 @@ namespace RockWeb.Blocks.Groups
                         {
                             var fieldTypeEntityCopy = group.Attributes[attributeKey].FieldType.Field as IEntityFieldTypeEntityCopy;
                             string value = group.GetAttributeValue( attributeKey );
-                            if (fieldTypeEntityCopy != null )
+                            if ( fieldTypeEntityCopy != null )
                             {
-                                value = fieldTypeEntityCopy.CopyAttribute( value, EntityCopyAction.DuplicateOriginal, rockContext );                                
+                                value = fieldTypeEntityCopy.CopyAttribute( value, EntityCopyAction.DuplicateOriginal, rockContext );
                             }
                             newGroup.SetAttributeValue( attributeKey, value );
                         }
@@ -1208,7 +1208,7 @@ namespace RockWeb.Blocks.Groups
                     // Get the existing attributes for this entity type and qualifier value
                     var attributes = attributeService
                         .GetByEntityTypeQualifier( entityTypeId, qualifierColumn, qualifierValue, true );
-                        //.Where(a => !(a is IHasEntityReferenceValues));
+                    //.Where(a => !(a is IHasEntityReferenceValues));
 
                     foreach ( var attribute in attributes )
                     {
@@ -2298,7 +2298,7 @@ namespace RockWeb.Blocks.Groups
 
             foreach ( var rsvpReminder in rsvpReminderCommunications )
             {
-                ddlRsvpReminderSystemCommunication.Items.Add( new ListItem(rsvpReminder.Title, rsvpReminder.Id.ToString() ) );
+                ddlRsvpReminderSystemCommunication.Items.Add( new ListItem( rsvpReminder.Title, rsvpReminder.Id.ToString() ) );
             }
 
             ddlAttendanceRecordRequiredForCheckIn.BindToEnum<AttendanceRecordRequiredForCheckIn>();

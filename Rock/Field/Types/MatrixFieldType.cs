@@ -389,6 +389,34 @@ namespace Rock.Field.Types
 
         #endregion
 
+        #region IEntityFieldTypeEntityCopy Implementation
+
+        /// <summary>
+        /// Gets the actions handled.
+        /// </summary>
+        /// <value>
+        /// The actions handled.
+        /// </value>
+        public IEnumerable<EntityCopyAction> ActionsHandled
+        {
+            get
+            {
+                return new List<EntityCopyAction>
+                {
+                    EntityCopyAction.DoNotCopy,
+                    EntityCopyAction.DuplicateOriginal,
+                    EntityCopyAction.UseOriginal
+                };
+            }
+        }
+
+        /// <summary>
+        /// Copies the attribute.
+        /// </summary>
+        /// <param name="originalValue">The original value.</param>
+        /// <param name="copyAction">The copy action.</param>
+        /// <param name="rockContext">The rock context.</param>
+        /// <returns></returns>
         public string CopyAttribute( string originalValue, EntityCopyAction copyAction, RockContext rockContext )
         {
             switch ( copyAction )
@@ -397,57 +425,94 @@ namespace Rock.Field.Types
                     return originalValue;
                 case EntityCopyAction.DuplicateOriginal:
                     Guid? guid = originalValue.AsGuidOrNull();
+
                     if ( guid != null )
                     {
-                        var service = new AttributeMatrixService( rockContext );
-                        var itemService = new AttributeMatrixItemService( rockContext );
-
-                        var item = service.Get( guid.Value );
-                        var newItem = item.Clone( false );
-
-                        newItem.Guid = Guid.NewGuid();
-                        newItem.CreatedDateTime = RockDateTime.Now;
-                        newItem.ModifiedDateTime = RockDateTime.Now;
-
-                        newItem.AttributeMatrixTemplateId = item.AttributeMatrixTemplateId;
-                        newItem.AttributeMatrixItems = new List<AttributeMatrixItem>();
-
-                        foreach ( var matrixItem in item.AttributeMatrixItems )
-                        {
-                            var newMatrixItem = matrixItem.Clone( false );
-                            newMatrixItem.Guid = Guid.NewGuid();
-                            newMatrixItem.CreatedDateTime = RockDateTime.Now;
-                            newMatrixItem.ModifiedDateTime = RockDateTime.Now;
-
-                            newItem.AttributeMatrixItems.Add( newMatrixItem );
-                        }
-                        service.Add( newItem );
-
-                        rockContext.SaveChanges();
-
-                        for ( var i = 0; i < newItem.AttributeMatrixItems.Count; i++ )
-                        {
-                            var originalMatrixItem = item.AttributeMatrixItems.ToList()[i];
-                            originalMatrixItem.LoadAttributes();
-
-                            var newMatrixItem = newItem.AttributeMatrixItems.ToList()[i];
-                            newMatrixItem.LoadAttributes();
-
-                            foreach ( var key in originalMatrixItem.Attributes.Keys )
-                            {
-                                var mav = originalMatrixItem.GetAttributeValue( key );
-                                newMatrixItem.SetAttributeValue( key, mav );
-                            }
-
-                            newMatrixItem.SaveAttributeValues( rockContext );
-                        }
-
-                        return newItem.Guid.ToString();
+                        return CreateAttributeMatrixCopy( rockContext, guid.Value ).ToString();
                     }
-                    return string.Empty;
+
+                    return originalValue;
                 default:
                     return string.Empty;
             }
         }
+
+        /// <summary>
+        /// Creates the attribute matrix copy.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <param name="originalGuid">The original unique identifier.</param>
+        /// <returns></returns>
+        private Guid CreateAttributeMatrixCopy( RockContext rockContext, Guid originalGuid )
+        {
+            var service = new AttributeMatrixService( rockContext );
+
+            var item = service.Get( originalGuid );
+            var newItem = CopyAttributeMatrix( item );
+
+            service.Add( newItem );
+
+            rockContext.SaveChanges();
+
+            CopyAttributeMatrixItemAttributes( rockContext, item, newItem );
+
+            return newItem.Guid;
+        }
+
+        /// <summary>
+        /// Copies the attribute matrix item attributes.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <param name="item">The item.</param>
+        /// <param name="newItem">The new item.</param>
+        private void CopyAttributeMatrixItemAttributes( RockContext rockContext, AttributeMatrix item, AttributeMatrix newItem )
+        {
+            for ( var i = 0; i < newItem.AttributeMatrixItems.Count; i++ )
+            {
+                var originalMatrixItem = item.AttributeMatrixItems.ToList()[i];
+                originalMatrixItem.LoadAttributes();
+
+                var newMatrixItem = newItem.AttributeMatrixItems.ToList()[i];
+                newMatrixItem.LoadAttributes();
+
+                foreach ( var key in originalMatrixItem.Attributes.Keys )
+                {
+                    var mav = originalMatrixItem.GetAttributeValue( key );
+                    newMatrixItem.SetAttributeValue( key, mav );
+                }
+
+                newMatrixItem.SaveAttributeValues( rockContext );
+            }
+        }
+
+        /// <summary>
+        /// Copies the attribute matrix.
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <returns></returns>
+        private AttributeMatrix CopyAttributeMatrix( AttributeMatrix item )
+        {
+            var newItem = item.Clone( false );
+
+            newItem.Guid = Guid.NewGuid();
+            newItem.CreatedDateTime = RockDateTime.Now;
+            newItem.ModifiedDateTime = RockDateTime.Now;
+
+            newItem.AttributeMatrixTemplateId = item.AttributeMatrixTemplateId;
+            newItem.AttributeMatrixItems = new List<AttributeMatrixItem>();
+
+            foreach ( var matrixItem in item.AttributeMatrixItems )
+            {
+                var newMatrixItem = matrixItem.Clone( false );
+                newMatrixItem.Guid = Guid.NewGuid();
+                newMatrixItem.CreatedDateTime = RockDateTime.Now;
+                newMatrixItem.ModifiedDateTime = RockDateTime.Now;
+
+                newItem.AttributeMatrixItems.Add( newMatrixItem );
+            }
+
+            return newItem;
+        }
+        #endregion
     }
 }
