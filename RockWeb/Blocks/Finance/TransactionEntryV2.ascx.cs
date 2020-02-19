@@ -1005,11 +1005,10 @@ mission. We are so grateful for your commitment.</p>
 
             // get the FinancialGateway's GatewayComponent so we can show a warning if they have an unsupported gateway.
             var hostedGatewayComponent = FinancialGateway.GetGatewayComponent() as IHostedGatewayComponent;
-            bool unsupportedGateway = ( hostedGatewayComponent == null || !hostedGatewayComponent.GetHostedGatewayModes( FinancialGateway ).Contains( HostedGatewayMode.Hosted ) );
 
             var testGatewayGuid = Rock.SystemGuid.EntityType.FINANCIAL_GATEWAY_TEST_GATEWAY.AsGuid();
 
-            if ( unsupportedGateway )
+            if ( hostedGatewayComponent == null )
             {
                 ShowConfigurationMessage( NotificationBoxType.Warning, "Unsupported Gateway", "This block only support Gateways that have a hosted payment interface." );
                 pnlTransactionEntry.Visible = false;

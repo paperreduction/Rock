@@ -96,13 +96,6 @@ namespace Rock.NMI
         DefaultValue = "",
         Order = 6 )]
 
-    [EnumsField( "Hosted Gateway Modes",
-        Key = AttributeKey.HostedGatewayModes,
-        Description = "The hosted gateway modes that should be supported",
-        EnumSourceType = typeof( HostedGatewayMode ),
-        DefaultValue = "0",
-        Order = 7 )]
-
     [BooleanField(
         "Prompt for Name On Card",
         Key = AttributeKey.PromptForName,
@@ -137,7 +130,6 @@ namespace Rock.NMI
             public const string QueryUrl = "QueryUrl";
             public const string DirectPostAPIUrl = "DirectPostAPIUrl";
             public const string TokenizationKey = "TokenizationKey";
-            public const string HostedGatewayModes = "EnabledHostedGatewayModes";
             public const string PromptForName = "PromptForName";
             public const string PromptForAddress = "PromptForAddress";
         }
@@ -1444,21 +1436,25 @@ namespace Rock.NMI
         public string LearnMoreURL => "https://www.nmi.com/";
 
         /// <summary>
-        /// Gets the hosted gateway modes that this gateway has enabled
+        /// Gets the hosted gateway modes that this gateway has configured/supports. Use this to determine which mode to use (in cases where both are supported, like Scheduled Payments lists ).
+        /// If the Gateway supports both hosted and unhosted (and has Hosted mode configured), hosted mode should be preferred.
         /// </summary>
+        /// <param name="financialGateway"></param>
+        /// <returns></returns>
         /// <value>
-        /// The hosted gateway modes.
+        /// The hosted gateway modes that this gateway supports
         /// </value>
-        public HostedGatewayMode[] GetHostedGatewayModes( FinancialGateway financialGateway )
+        public HostedGatewayMode[] GetSupportedHostedGatewayModes( FinancialGateway financialGateway )
         {
-            var hostedGatewayModes = this.GetAttributeValue( financialGateway, AttributeKey.HostedGatewayModes )?.Split( ',' ).Select( a => a.ConvertToEnumOrNull<HostedGatewayMode>() ).Where( a => a != null ).Select( a => a.Value ).ToList();
-            if ( hostedGatewayModes == null )
+            // NMI Gateway supports Hosted mode if a TokenizationKey is configured. If so, Hosted gateway mode should be preferred
+            var hostedGatewayConfigured = this.GetAttributeValue( financialGateway, AttributeKey.TokenizationKey ).IsNotNullOrWhiteSpace();
+            if ( !hostedGatewayConfigured )
             {
                 return new HostedGatewayMode[1] { HostedGatewayMode.Unhosted };
             }
             else
             {
-                return hostedGatewayModes.ToArray();
+                return new HostedGatewayMode[2] { HostedGatewayMode.Hosted, HostedGatewayMode.Unhosted };
             }
         }
 

@@ -465,12 +465,12 @@ TransactionAccountDetails: [
             var achHostedGatewayComponent = _achGatewayComponent as IHostedGatewayComponent;
             bool gatewaySupportsUnhostedPayment = true;
 
-            if ( ccHostedGatewayComponent != null && !ccHostedGatewayComponent.GetHostedGatewayModes( _ccGateway ).Contains( HostedGatewayMode.Unhosted ) )
+            if ( ccHostedGatewayComponent != null && !ccHostedGatewayComponent.GetSupportedHostedGatewayModes( _ccGateway ).Contains( HostedGatewayMode.Unhosted ) )
             {
                 gatewaySupportsUnhostedPayment = false;
             }
 
-            if ( achHostedGatewayComponent != null && !achHostedGatewayComponent.GetHostedGatewayModes( _achGateway ).Contains( HostedGatewayMode.Unhosted ) )
+            if ( achHostedGatewayComponent != null && !achHostedGatewayComponent.GetSupportedHostedGatewayModes( _achGateway ).Contains( HostedGatewayMode.Unhosted ) )
             {
                 gatewaySupportsUnhostedPayment = false;
             }

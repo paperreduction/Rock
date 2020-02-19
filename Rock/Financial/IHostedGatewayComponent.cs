@@ -89,11 +89,12 @@ namespace Rock.Financial
         DateTime GetEarliestScheduledStartDate( FinancialGateway financialGateway );
 
         /// <summary>
-        /// Gets the hosted gateway modes that this gateway has enabled
+        /// Gets the hosted gateway modes that this gateway has configured/supports. Use this to determine which mode to use (in cases where both are supported, like Scheduled Payments lists ).
+        /// If the Gateway supports both hosted and unhosted (and has Hosted mode configured), hosted mode should be preferred.
         /// </summary>
         /// <value>
-        /// The hosted gateway modes.
+        /// The hosted gateway modes that this gateway supports
         /// </value>
-        HostedGatewayMode[] GetHostedGatewayModes( FinancialGateway financialGateway );
+        HostedGatewayMode[] GetSupportedHostedGatewayModes( FinancialGateway financialGateway );
     }
 }

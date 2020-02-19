@@ -350,7 +350,7 @@ namespace RockWeb.Blocks.Finance
             else
             {
                 var hostedGatewayComponent = financialScheduledTransaction.FinancialGateway.GetGatewayComponent() as IHostedGatewayComponent;
-                if ( hostedGatewayComponent != null && hostedGatewayComponent.GetHostedGatewayModes( financialScheduledTransaction.FinancialGateway ).Contains( HostedGatewayMode.Hosted ) )
+                if ( hostedGatewayComponent != null && hostedGatewayComponent.GetSupportedHostedGatewayModes( financialScheduledTransaction.FinancialGateway ).Contains( HostedGatewayMode.Hosted ) )
                 {
                     NavigateToLinkedPage( AttributeKey.ScheduledTransactionEditPageHosted, qryParams );
                 }

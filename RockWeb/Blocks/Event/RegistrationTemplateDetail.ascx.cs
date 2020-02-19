@@ -893,21 +893,20 @@ The logged-in person's information will be used to complete the registrar inform
 
             var rockContext = new RockContext();
 
-            // validate gateway
             int? gatewayId = fgpFinancialGateway.SelectedValueAsInt();
+
+            // validate gateway
             if ( gatewayId.HasValue )
             {
                 var financialGateway = new FinancialGatewayService( rockContext ).Get( gatewayId.Value );
                 if ( financialGateway != null )
                 {
-                    if ( financialGateway.GetGatewayComponent() is Rock.Financial.IHostedGatewayComponent )
+                    var hostedGatewayComponent = financialGateway.GetGatewayComponent() as Rock.Financial.IHostedGatewayComponent;
+                    if ( hostedGatewayComponent != null && !hostedGatewayComponent.GetSupportedHostedGatewayModes( financialGateway ).Contains( Rock.Financial.HostedGatewayMode.Unhosted ) )
                     {
-                        if ( !( financialGateway.GetGatewayComponent() as Rock.Financial.IHostedGatewayComponent ).GetHostedGatewayModes( financialGateway ).Contains( Rock.Financial.HostedGatewayMode.Unhosted ) )
-                        {
-                            nbValidationError.Text = "Unsupported Gateway. Registration currently only supports Gateways that have an un-hosted payment interface.";
-                            nbValidationError.Visible = true;
-                            return;
-                        }
+                        nbValidationError.Text = "Unsupported Gateway. Registration currently only supports Gateways that have an un-hosted payment interface.";
+                        nbValidationError.Visible = true;
+                        return;
                     }
                 }
             }
@@ -3734,7 +3733,7 @@ The logged-in person's information will be used to complete the registrar inform
                 registrationTemplatePlacement = new RegistrationTemplatePlacement();
                 registrationTemplatePlacement.Guid = registrationPlacementConfigurationGuid;
             }
-            
+
             tbPlacementConfigurationName.Text = registrationTemplatePlacement.Name;
             gtpPlacementConfigurationGroupTypeEdit.SelectedGroupTypeId = registrationTemplatePlacement.GroupTypeId;
 
@@ -3895,7 +3894,7 @@ The logged-in person's information will be used to complete the registrar inform
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void btnPlacementConfigurationAddSharedGroupCancel_Click( object sender, EventArgs e )
         {
-            
+
             pnlPlacementConfigurationAddSharedGroup.Visible = false;
         }
 
@@ -3911,6 +3910,6 @@ The logged-in person's information will be used to complete the registrar inform
 
         #endregion
 
-        
+
     }
 }

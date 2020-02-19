@@ -305,13 +305,17 @@ namespace Rock.TransNational.Pi
         public string ConfigureURL => "https://www.mywell.org/get-started/";
 
         /// <summary>
-        /// Gets the hosted gateway modes that this gateway has enabled
+        /// Gets the hosted gateway modes that this gateway has configured/supports. Use this to determine which mode to use (in cases where both are supported, like Scheduled Payments lists ).
+        /// If the Gateway supports both hosted and unhosted (and has Hosted mode configured), hosted mode should be preferred.
         /// </summary>
+        /// <param name="financialGateway"></param>
+        /// <returns></returns>
         /// <value>
-        /// The hosted gateway modes.
+        /// The hosted gateway modes that this gateway supports
         /// </value>
-        public HostedGatewayMode[] GetHostedGatewayModes( FinancialGateway financialGateway )
+        public HostedGatewayMode[] GetSupportedHostedGatewayModes( FinancialGateway financialGateway )
         {
+            // MyWellGateway only supports Hosted mode
             return new HostedGatewayMode[1] { HostedGatewayMode.Hosted }; 
         }
 
